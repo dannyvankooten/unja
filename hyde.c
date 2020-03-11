@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpc.h"
+#include "vendor/mpc.h"
+#include "hashmap.h"
+
+
+struct post {
+    char title[64];
+    char tags[8][32];
+};
 
 char *read_file(char *filename) {
     char *input = malloc(BUFSIZ);
@@ -24,43 +31,112 @@ char *read_file(char *filename) {
     return input;
 }
 
-int main() {
-    mpc_parser_t *Symbol  = mpc_new("symbol");
-    mpc_parser_t *Text  = mpc_new("text");
-    mpc_parser_t *Var_Open  = mpc_new("var_open");
-    mpc_parser_t *Var_Close  = mpc_new("var_close");
-    mpc_parser_t *Var  = mpc_new("var");
-    mpc_parser_t *Block_Open  = mpc_new("block_open");
-    mpc_parser_t *Block_Close  = mpc_new("block_close");
-    mpc_parser_t *Block  = mpc_new("block");
-    mpc_parser_t *For  = mpc_new("for");
-    mpc_parser_t *Content  = mpc_new("content");
-    mpc_parser_t *Template  = mpc_new("template");
-    mpca_lang(MPCA_LANG_DEFAULT,
+int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
+    printf("%s: %s\n", t->tag, t->contents);
+
+    if (strstr(t->tag, "content|text")) {
+        strcat(dest, t->contents);
+        return 0;
+    }
+
+    if (strstr(t->tag, "content|var")) {
+        printf("Key: %s\n", t->contents);
+        char *value = hashmap_get(ctx, t->children[1]->contents);
+        if  (value == NULL) {
+            return 1;
+        }
+        strcat(dest, value);
+        return 0;
+    }
+
+    if (strstr(t->tag, "content|for")) {
+        char *tmp_key = t->children[2]->contents;
+        char *iterator_key = t->children[4]->contents;
+        // TODO: Make this dynamic
+        struct post **posts = hashmap_get(ctx, iterator_key);
+        for (int i=0; i < 2; i++) {
+            hashmap_insert(ctx, tmp_key, posts[i]);
+            eval(dest, t->children[6], ctx);
+        }
+        return 0;
+    }
+
+    for (int i=0; i < t->children_num; i++) {
+        eval(dest, t->children[i], ctx);
+    }
+    
+    return 0;
+}
+
+mpc_parser_t *parser_init() {
+    mpc_parser_t *Symbol = mpc_new("symbol");
+    mpc_parser_t *Text = mpc_new("text");
+    mpc_parser_t *Var_Open = mpc_new("var_open");
+    mpc_parser_t *Var_Close = mpc_new("var_close");
+    mpc_parser_t *Var = mpc_new("var");
+    mpc_parser_t *Block_Open = mpc_new("block_open");
+    mpc_parser_t *Block_Close = mpc_new("block_close");
+    mpc_parser_t *For = mpc_new("for");
+    mpc_parser_t *Content = mpc_new("content");
+    mpc_parser_t *Template = mpc_new("template");
+    mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
     " symbol    : /[a-zA-Z._]+/ ;"
-    " var_open  : \"{{\" ;"
-    " var_close : \"}}\" ;"
+    " var_open  : /\{{2} ?/ ;"
+    " var_close : / ?}{2}/ ;"
     " var       : <var_open> <symbol> <var_close> ;"
-    " block_open: \"{%\" ;"
-    " block_close: \"%}\" ;"
-    " for       : <block_open> \"for\" <symbol> \"in\" <symbol> <block_close> <content>* <block_open> \"endfor\" <block_close> ;"
+    " block_open: /\{\% ?/ ;"
+    " block_close: / ?\%}/ ;"
+    " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <content>* <block_open> \"endfor\" <block_close> ;"
     " text      : /[^{][^{%]*/ ;"
     " content   : <var> | <for> | <text>;"
     " template  : /^/ <content>* /$/ ;",
     Symbol, Var_Open, Var_Close, Var, Block_Open, Block_Close, For, Text, Content, Template, NULL);
+    return Template;
+}
 
-    char *content = read_file("index.tpl");
+void template(char *tmpl, struct hashmap *ctx) {
+    mpc_parser_t *parser = parser_init();
+    mpc_result_t r;
 
-     mpc_result_t r;
-
-    if (mpc_parse("input", content, Template, &r)) {
+    if (mpc_parse("input", tmpl, parser, &r)) {
         mpc_ast_print(r.output);
+        
+        // FIXME: Allocate precisely
+        char *output = malloc(strlen(tmpl) * 2);
+        output[0] = '\0';
+        eval(output, r.output, ctx);
+        printf("Template: \n%s", output);
+        
         mpc_ast_delete(r.output);
+        free(output);
     } else {
         mpc_err_print(r.error);
         mpc_err_delete(r.error);
     }
+}
 
-    mpc_cleanup(11, Symbol, Var_Open, Var_Close, Var, Block_Open, Block_Close, For, Block, Text, Content, Template);
-    free(content);
+
+int main() {
+    char *input = read_file("index.tpl");
+
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "title", "Hello world");
+
+    struct post home = { 
+        .title = "Homepage",
+        .tags = {
+            "Tag 1", "Tag 2"
+        }
+    };
+    hashmap_insert(ctx, "home", &home);
+
+    struct post posts[] = {
+        { .title = "Post 1", .tags = { "p1t1" } },
+        { .title = "Post 2", .tags = { "p2t1" } },
+    };
+    hashmap_insert(ctx, "posts", &posts);
+
+    template(input, ctx);
+    hashmap_free(ctx);
+    free(input);
 }
