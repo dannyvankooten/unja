@@ -1,4 +1,5 @@
 #include "template.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 int main() {
@@ -21,7 +22,9 @@ int main() {
     };
     hashmap_insert(ctx, "posts", &posts);
 
-    template(input, ctx);
+    char *output = template(input, ctx);
+    printf("Output: %s\n", output);
     hashmap_free(ctx);
     free(input);
+    free(output);
 }

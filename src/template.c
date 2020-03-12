@@ -89,24 +89,25 @@ mpc_parser_t *parser_init() {
     return Template;
 }
 
-void template(char *tmpl, struct hashmap *ctx) {
+char * template(char *tmpl, struct hashmap *ctx) {
     mpc_parser_t *parser = parser_init();
     mpc_result_t r;
 
-    if (mpc_parse("input", tmpl, parser, &r)) {
-        mpc_ast_print(r.output);
-        
-        // FIXME: Allocate precisely
-        char *output = malloc(strlen(tmpl) * 2);
-        output[0] = '\0';
-        eval(output, r.output, ctx);
-        printf("Template: \n%s", output);
-        
-        mpc_ast_delete(r.output);
-        free(output);
-    } else {
+    if (!mpc_parse("input", tmpl, parser, &r)) {
         mpc_err_print(r.error);
         mpc_err_delete(r.error);
+        return NULL;
     }
+
+    mpc_ast_print(r.output);
+        
+    // FIXME: Allocate precisely
+    char *output = malloc(strlen(tmpl) * 2);
+    output[0] = '\0';
+
+    eval(output, r.output, ctx);
+    mpc_ast_delete(r.output);
+
+    return output;
 }
 

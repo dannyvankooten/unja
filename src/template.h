@@ -1,7 +1,7 @@
 #include "hashmap.h"
 
 char *read_file(char *filename);
-void template(char *tmpl, struct hashmap *ctx);
+char *template(char *tmpl, struct hashmap *ctx);
 
 struct post {
     char title[64];

@@ -1,6 +1,7 @@
+#define HASHMAP_CAP 26
 
 struct hashmap {
-    struct node *buckets[26];
+    struct node *buckets[HASHMAP_CAP];
 };
 
 void hashmap_insert(struct hashmap *hm, char *key, void *value);
