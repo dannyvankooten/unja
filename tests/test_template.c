@@ -61,4 +61,11 @@ TEST(var_dot_notation) {
     free(output);
 }
 
+TEST(comments) {
+    char *input = "Hello {# comment here #} world.";
+    char *output = template(input, NULL);
+    assert_str(output, "Hello  world.");
+    free(output);
+}
+
 END_TESTS 

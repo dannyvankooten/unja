@@ -72,23 +72,44 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *Var = mpc_new("var");
     mpc_parser_t *Block_Open = mpc_new("block_open");
     mpc_parser_t *Block_Close = mpc_new("block_close");
+    mpc_parser_t *Comment = mpc_new("comment");
+    mpc_parser_t *Comment_Open = mpc_new("comment_open");
+    mpc_parser_t *Comment_Close = mpc_new("comment_close");
     mpc_parser_t *For = mpc_new("for");
     mpc_parser_t *Body = mpc_new("body");
     mpc_parser_t *Content = mpc_new("content");
     mpc_parser_t *Template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
-    " symbol    : /[a-zA-Z_.]+/ ;"
-    " var_open  : /\{{2} ?/ ;"
-    " var_close : / ?}{2}/ ;"
-    " var       : <var_open> <symbol> <var_close> ;"
-    " block_open: /\{\% ?/ ;"
-    " block_close: / ?\%}/ ;"
-    " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
-    " text      : /[^{][^{%]*/ ;"
-    " content   : <var> | <for> | <text>;"
-    " body      : <content>* ;"
-    " template  : /^/ <body> /$/ ;",
-    Symbol, Symbols, Var_Open, Var_Close, Var, Block_Open, Block_Close, For, Text, Content, Body, Template, NULL);
+        " symbol    : /[a-zA-Z_.]+/ ;"
+        " var_open  : /\{{2} ?/ ;"
+        " var_close : / ?}{2}/ ;"
+        " var       : <var_open> <symbol> <var_close> ;"
+        " block_open: /\{\% ?/ ;"
+        " block_close: / ?\%}/ ;"
+        " comment_open  : \"{#\" ;"
+        " comment_close : \"#}\" ;"
+        " comment : <comment_open> /[^#][^#}]*/ <comment_close> ;"
+        " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
+        " text      : /[^{][^{%]*/ ;"
+        " content   : <var> | <for> | <text> | <comment>;"
+        " body      : <content>* ;"
+        " template  : /^/ <body> /$/ ;",
+        Symbol, 
+        Symbols, 
+        Var_Open, 
+        Var_Close, 
+        Var, 
+        Block_Open, 
+        Block_Close, 
+        Comment_Open, 
+        Comment_Close,
+        Comment,
+        For, 
+        Text, 
+        Content, 
+        Body, 
+        Template, 
+        NULL);
     return Template;
 }
 
