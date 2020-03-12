@@ -6,7 +6,7 @@
 #define START_TESTS int main() {
 #define END_TESTS }
 #define TEST(name) strcpy(current_test, #name);
-#define assert_str(actual, expected) _assert(strcmp(actual, expected) == 0, __FILE__, __LINE__, "invalid string: expected %s, got %s", expected, actual)
+#define assert_str(actual, expected) _assert(actual != NULL && strcmp(actual, expected) == 0, __FILE__, __LINE__, "invalid string: expected %s, got %s", expected, actual)
 #define assert(assertion, format, ...) _assert(assertion, __FILE__, __LINE__, format, ##__VA_ARGS__)
 
 /* used to store the running test name */
@@ -25,4 +25,5 @@ static void _assert(int assertion, const char filename[64], const int line, char
     vprintf(format, args);
     va_end(args);
     printf("\n");
+    exit(1);
 }

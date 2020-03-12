@@ -10,7 +10,7 @@ TEST(text_only) {
     free(output);
 }
 
-TEST(text_with_var) {
+TEST(var) {
     char *input = "Hello {{name}}.";
     struct hashmap *ctx = hashmap_new();
     hashmap_insert(ctx, "name", "world");
@@ -20,7 +20,7 @@ TEST(text_with_var) {
     free(output);
 }
 
-TEST(text_multiline) {
+TEST(multiline) {
     char *input = "Hello {{name}}.\nL2";
     struct hashmap *ctx = hashmap_new();
     hashmap_insert(ctx, "name", "world");
@@ -39,11 +39,24 @@ TEST(for_block) {
     vector_push(numbers, "2");
     vector_push(numbers, "3");
     hashmap_insert(ctx, "numbers", numbers);
-    
+
     char *output = template(input, ctx);
     assert_str(output, "1, 2, 3, ");
-
     vector_free(numbers);
+    hashmap_free(ctx);
+    free(output);
+}
+
+TEST(var_dot_notation) {
+    char *input = "Hello {{user.name}}!";
+     struct hashmap *user = hashmap_new();
+    hashmap_insert(user, "name", "Danny");
+
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "user", user);
+    
+    char *output = template(input, ctx);
+    assert_str(output, "Hello Danny!");
     hashmap_free(ctx);
     free(output);
 }
