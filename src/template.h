@@ -7,3 +7,9 @@ struct post {
     char title[64];
     char tags[8][32];
 };
+
+struct list {
+    void **values;
+    int size;
+    int cap;
+};

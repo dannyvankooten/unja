@@ -30,7 +30,21 @@ TEST(text_multiline) {
     free(output);
 }
 
-
-
+TEST(for_block) {
+    char *input = "{% for n in numbers %}{{ n }}, {% endfor %}";
+    struct hashmap *ctx = hashmap_new();
+    struct list numbers;
+    numbers.size = 0;
+    numbers.cap = 64;
+    numbers.values = malloc(numbers.cap * sizeof *numbers.values);
+    numbers.values[numbers.size++] = "1";
+    numbers.values[numbers.size++] = "2";
+    numbers.values[numbers.size++] = "3";
+    hashmap_insert(ctx, "numbers", &numbers);
+    char *output = template(input, ctx);
+    assert_str(output, "1, 2, 3, ");
+    hashmap_free(ctx);
+    free(output);
+}
 
 END_TESTS 
