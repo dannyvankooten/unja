@@ -33,16 +33,17 @@ TEST(text_multiline) {
 TEST(for_block) {
     char *input = "{% for n in numbers %}{{ n }}, {% endfor %}";
     struct hashmap *ctx = hashmap_new();
-    struct list numbers;
-    numbers.size = 0;
-    numbers.cap = 64;
-    numbers.values = malloc(numbers.cap * sizeof *numbers.values);
-    numbers.values[numbers.size++] = "1";
-    numbers.values[numbers.size++] = "2";
-    numbers.values[numbers.size++] = "3";
-    hashmap_insert(ctx, "numbers", &numbers);
+
+    struct vector *numbers = vector_new(3);
+    vector_push(numbers, "1");
+    vector_push(numbers, "2");
+    vector_push(numbers, "3");
+    hashmap_insert(ctx, "numbers", numbers);
+    
     char *output = template(input, ctx);
     assert_str(output, "1, 2, 3, ");
+
+    vector_free(numbers);
     hashmap_free(ctx);
     free(output);
 }

@@ -6,13 +6,13 @@ all: bin/hyde
 
 bin:; mkdir -p bin/
 
-bin/hyde: src/hyde.c src/hashmap.c src/template.c vendor/mpc.c | bin
+bin/hyde: src/hyde.c src/hashmap.c src/template.c src/vector.c vendor/mpc.c | bin
 	$(CC) $(CFLAGS) $^ -o $@
 
 bin/test_hashmap: src/hashmap.c tests/test_hashmap.c | bin
 	$(CC) $(TESTFLAGS) $^ -o $@
 
-bin/test_template: src/template.c src/hashmap.c tests/test_template.c vendor/mpc.c | bin 
+bin/test_template: src/template.c src/hashmap.c src/vector.c tests/test_template.c vendor/mpc.c | bin 
 	$(CC) $(TESTFLAGS) $^ -o $@
 
 .PHONY: check

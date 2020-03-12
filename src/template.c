@@ -30,7 +30,6 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     printf("%s: %s\n", t->tag, t->contents);
 
     if (strstr(t->tag, "content|var")) {
-        printf("Key: %s\n", t->contents);
         char *value = (char *) hashmap_get(ctx, t->children[1]->contents);
         if  (value == NULL) {
             return 1;
@@ -42,7 +41,7 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     if (strstr(t->tag, "content|for")) {
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
-        struct list *list = hashmap_get(ctx, iterator_key);
+        struct vector *list = hashmap_get(ctx, iterator_key);
         for (int i=0; i < list->size; i++) {
             hashmap_insert(ctx, tmp_key, list->values[i]);
             eval(dest, t->children[6], ctx);

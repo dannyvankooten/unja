@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+struct post {
+    char title[64];
+    char tags[8][32];
+};
+
 int main() {
     char *input = read_file("index.tpl");
 
