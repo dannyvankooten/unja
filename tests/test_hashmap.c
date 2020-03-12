@@ -1,7 +1,9 @@
 #include "test.h"
 #include "hashmap.h"
 
-int main() {
+START_TESTS
+
+TEST(hashmap) {
     struct hashmap *hm = hashmap_new();
     assert(hashmap_get(hm, "foo") == NULL, "expected NULL");
 
@@ -11,4 +13,6 @@ int main() {
     assert(strcmp(value, "bar") == 0, "expected %s, got %s", "bar", value);
 
     hashmap_free(hm);
-}
+} 
+
+END_TESTS

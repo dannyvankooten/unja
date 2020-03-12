@@ -3,12 +3,15 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define assert(assertion, format, ...) _assert(assertion, __FILE__, __LINE__, format, ##__VA_ARGS__)
-#define TESTNAME(v) strcpy(current_test, v);
+#define START_TESTS int main() {
+#define END_TESTS }
+#define TEST(name) strcpy(current_test, #name);
 
+/* used to store the running test name */
 char current_test[256] = {'\0'};
 
-void _assert(int assertion, const char filename[64], const int line, char *format, ...)
+#define assert(assertion, format, ...) _assert(assertion, __FILE__, __LINE__, format, ##__VA_ARGS__)
+static void _assert(int assertion, const char filename[64], const int line, char *format, ...)
 {
     if (assertion)
     {
