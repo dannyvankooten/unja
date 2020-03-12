@@ -15,4 +15,18 @@ TEST(hashmap) {
     hashmap_free(hm);
 } 
 
+
+TEST(dot_notation) {
+
+    struct hashmap *user = hashmap_new();
+    hashmap_insert(user, "name", "Danny");
+    struct hashmap *hm = hashmap_new();
+    hashmap_insert(hm, "user", user);
+    char *value = (char *) hashmap_resolve(hm, "user.name");
+    assert(value != NULL, "expected value, got NULL");
+    assert(strcmp(value, "Danny") == 0, "expected %s, got %s", "Danny", value);
+
+    hashmap_free(hm);
+} 
+
 END_TESTS

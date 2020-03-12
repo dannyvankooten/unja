@@ -1,4 +1,4 @@
-CFLAGS= -g -Wall -std=c11 -I.
+override CFLAGS+= -g -Wall -std=c11 -I.
 LIBS= 
 TESTFLAGS= $(CFLAGS) -Isrc/
 

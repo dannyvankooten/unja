@@ -29,23 +29,9 @@ char *read_file(char *filename) {
 int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     if (strstr(t->tag, "content|var")) {
         char *value = NULL;
-
-        // TODO: Optimize this so we can use it for 1..n keys
-        if (t->children[1]->children_num == 0) {
-            char *key = t->children[1]->contents;
-            value = hashmap_get(ctx, key);
-        } else {
-            char *key = t->children[1]->children[0]->contents;
-            ctx = hashmap_get(ctx, key);
-            if (ctx == NULL) {
-                // TODO: Handle unexisting keys
-                return 1;
-            }
-
-            char *subkey = t->children[1]->children[2]->contents;
-            value = hashmap_get(ctx, subkey);
-        }
-
+        char *key = t->children[1]->contents;
+        value = hashmap_resolve(ctx, key);
+        
         // TODO: Handle unexisting keys
         if  (value == NULL) {
             return 1;
@@ -56,9 +42,8 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
     if (strstr(t->tag, "content|for")) {
         char *tmp_key = t->children[2]->contents;
-        // TODO: Handle dot notation here.
         char *iterator_key = t->children[4]->contents;
-        struct vector *list = hashmap_get(ctx, iterator_key);
+        struct vector *list = hashmap_resolve(ctx, iterator_key);
         for (int i=0; i < list->size; i++) {
             hashmap_insert(ctx, tmp_key, list->values[i]);
             eval(dest, t->children[6], ctx);
@@ -92,14 +77,13 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *Content = mpc_new("content");
     mpc_parser_t *Template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
-    " symbol    : /[a-zA-Z_]+/ ;"
-    " symbols   : <symbol>\".\"?<symbol>? ;"
+    " symbol    : /[a-zA-Z_.]+/ ;"
     " var_open  : /\{{2} ?/ ;"
     " var_close : / ?}{2}/ ;"
-    " var       : <var_open> <symbols> <var_close> ;"
+    " var       : <var_open> <symbol> <var_close> ;"
     " block_open: /\{\% ?/ ;"
     " block_close: / ?\%}/ ;"
-    " for       : <block_open> \"for \" <symbol> \" in \" <symbols> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
+    " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
     " text      : /[^{][^{%]*/ ;"
     " content   : <var> | <for> | <text>;"
     " body      : <content>* ;"
@@ -118,10 +102,12 @@ char *template(char *tmpl, struct hashmap *ctx) {
         return NULL;
     }
 
+    #if DEBUG
     printf("Template: %s\n", tmpl);
     printf("AST: ");
     mpc_ast_print(r.output);
     printf("\n");
+    #endif
         
     // FIXME: Allocate precisely
     char *output = malloc(strlen(tmpl) * 2);

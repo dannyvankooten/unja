@@ -55,8 +55,32 @@ void *hashmap_get(struct hashmap *hm, char *key) {
     return NULL;
 }
 
-void hashmap_remove(char *key) {
+void *hashmap_resolve(struct hashmap *hm, char *key) {
+    char tmp_key[64];
+    int i = 0;
+    int j = 0;
 
+    while (1) {
+        for (j=0; key[i] != '.' && key[i] != '\0'; i++, j++) {
+            tmp_key[j] = key[i];
+        }
+        tmp_key[j] = '\0';
+        hm = hashmap_get(hm, tmp_key);
+        
+        // stop if we read key to end of string
+        if (key[i] == '\0') {
+            break;
+        }
+
+        // otherwise, continue reading keys
+        i++;
+    }
+
+    return hm;
+}
+
+void hashmap_remove(char *key) {
+    // TODO: Implement this
 }
 
 void hashmap_free(struct hashmap *hm) {

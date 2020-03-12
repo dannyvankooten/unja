@@ -9,3 +9,4 @@ void *hashmap_get(struct hashmap *hm, char *key);
 void hashmap_remove(char *key);
 struct hashmap *hashmap_new();
 void hashmap_free(struct hashmap *hm);
+void *hashmap_resolve(struct hashmap *hm, char *key);
