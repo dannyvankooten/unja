@@ -26,8 +26,35 @@ char *read_file(char *filename) {
     return input;
 }
 
+char *trim_trailing_whitespace(char *str) {
+    for (int i=strlen(str)-1; isspace(str[i]); i--) {
+        str[i] = '\0';
+    }
+    return str;
+}
+
+char *trim_leading_whitespace(char *str) {
+    while (isspace(*str)) {
+        str++;
+    }
+
+    return str;
+}
+
 int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
+    static int trim_whitespace = 0;
+
     if (strstr(t->tag, "content|var")) {
+        // maybe eat whitespace going backward
+        if (strstr(t->children[0]->contents, "{{-")) {
+            dest = trim_trailing_whitespace(dest);
+        }
+
+        // set flag for next eval() to trim leading whitespace from text
+        if (strstr(t->children[2]->contents, "-}}")) {
+            trim_whitespace = 1;
+        }
+
         char *value = NULL;
         char *key = t->children[1]->contents;
         value = hashmap_resolve(ctx, key);
@@ -52,7 +79,13 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     }
 
     if (strstr(t->tag, "content|text")) {
-        strcat(dest, t->contents);
+        char *str = t->contents;
+        if (trim_whitespace) {
+            str = trim_leading_whitespace(str);
+            trim_whitespace = 0;
+        }
+
+        strcat(dest, str);
         return 0;
     }
 
@@ -65,8 +98,8 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
 mpc_parser_t *parser_init() {
     mpc_parser_t *Symbol = mpc_new("symbol");
-    mpc_parser_t *Symbols = mpc_new("symbols");
     mpc_parser_t *Text = mpc_new("text");
+    mpc_parser_t *Whitespace = mpc_new("whitespace");
     mpc_parser_t *Var_Open = mpc_new("var_open");
     mpc_parser_t *Var_Close = mpc_new("var_close");
     mpc_parser_t *Var = mpc_new("var");
@@ -81,8 +114,9 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *Template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
         " symbol    : /[a-zA-Z_.]+/ ;"
-        " var_open  : /\{{2} ?/ ;"
-        " var_close : / ?}{2}/ ;"
+        " whitespace: \"-\"; "
+        " var_open  : /\{{2}-? ?/ ;"
+        " var_close : / ?-?}{2}/ ;"
         " var       : <var_open> <symbol> <var_close> ;"
         " block_open: /\{\% ?/ ;"
         " block_close: / ?\%}/ ;"
@@ -95,7 +129,7 @@ mpc_parser_t *parser_init() {
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         Symbol, 
-        Symbols, 
+        Whitespace,
         Var_Open, 
         Var_Close, 
         Var, 

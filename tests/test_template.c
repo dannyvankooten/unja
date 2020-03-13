@@ -20,6 +20,16 @@ TEST(var) {
     free(output);
 }
 
+TEST(var_whitespace) {
+    char *input = "Hello \n{{-name -}}\n.";
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "name", "world");
+    char *output = template(input, ctx);
+    assert_str(output, "Helloworld.");
+    hashmap_free(ctx);
+    free(output);
+}
+
 TEST(multiline) {
     char *input = "Hello {{name}}.\nL2";
     struct hashmap *ctx = hashmap_new();
