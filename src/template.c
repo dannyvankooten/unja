@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "vendor/mpc.h"
 #include "template.h"
 
@@ -46,17 +45,17 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
     if (strstr(t->tag, "content|var")) {
         // maybe eat whitespace going backward
-        if (strstr(t->children[0]->contents, "{{-")) {
+        if (strstr(t->children[1]->contents, "-")) {
             dest = trim_trailing_whitespace(dest);
         }
 
         // set flag for next eval() to trim leading whitespace from text
-        if (strstr(t->children[2]->contents, "-}}")) {
+        if (strstr(t->children[3]->contents, "-")) {
             trim_whitespace = 1;
         }
 
         char *value = NULL;
-        char *key = t->children[1]->contents;
+        char *key = t->children[2]->contents;
         value = hashmap_resolve(ctx, key);
         
         // TODO: Handle unexisting keys
@@ -99,44 +98,29 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 mpc_parser_t *parser_init() {
     mpc_parser_t *Symbol = mpc_new("symbol");
     mpc_parser_t *Text = mpc_new("text");
-    mpc_parser_t *Whitespace = mpc_new("whitespace");
-    mpc_parser_t *Var_Open = mpc_new("var_open");
-    mpc_parser_t *Var_Close = mpc_new("var_close");
     mpc_parser_t *Var = mpc_new("var");
     mpc_parser_t *Block_Open = mpc_new("block_open");
     mpc_parser_t *Block_Close = mpc_new("block_close");
     mpc_parser_t *Comment = mpc_new("comment");
-    mpc_parser_t *Comment_Open = mpc_new("comment_open");
-    mpc_parser_t *Comment_Close = mpc_new("comment_close");
     mpc_parser_t *For = mpc_new("for");
     mpc_parser_t *Body = mpc_new("body");
     mpc_parser_t *Content = mpc_new("content");
     mpc_parser_t *Template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
         " symbol    : /[a-zA-Z_.]+/ ;"
-        " whitespace: \"-\"; "
-        " var_open  : /\{{2}-? ?/ ;"
-        " var_close : / ?-?}{2}/ ;"
-        " var       : <var_open> <symbol> <var_close> ;"
+        " var       : \"{{\" /-? ?/ <symbol> / ?-?/ \"}}\" ;"
         " block_open: /\{\% ?/ ;"
         " block_close: / ?\%}/ ;"
-        " comment_open  : \"{#\" ;"
-        " comment_close : \"#}\" ;"
-        " comment : <comment_open> /[^#][^#}]*/ <comment_close> ;"
+        " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
         " text      : /[^{][^{%]*/ ;"
         " content   : <var> | <for> | <text> | <comment>;"
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         Symbol, 
-        Whitespace,
-        Var_Open, 
-        Var_Close, 
         Var, 
         Block_Open, 
         Block_Close, 
-        Comment_Open, 
-        Comment_Close,
         Comment,
         For, 
         Text, 
