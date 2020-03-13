@@ -43,7 +43,7 @@ char *trim_leading_whitespace(char *str) {
 int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     static int trim_whitespace = 0;
 
-    if (strstr(t->tag, "content|var")) {
+    if (strstr(t->tag, "content|expression|")) {
         // maybe eat whitespace going backward
         if (strstr(t->children[1]->contents, "-")) {
             dest = trim_trailing_whitespace(dest);
@@ -96,39 +96,40 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 }
 
 mpc_parser_t *parser_init() {
-    mpc_parser_t *Symbol = mpc_new("symbol");
-    mpc_parser_t *Text = mpc_new("text");
-    mpc_parser_t *Var = mpc_new("var");
-    mpc_parser_t *Block_Open = mpc_new("block_open");
-    mpc_parser_t *Block_Close = mpc_new("block_close");
-    mpc_parser_t *Comment = mpc_new("comment");
-    mpc_parser_t *For = mpc_new("for");
-    mpc_parser_t *Body = mpc_new("body");
-    mpc_parser_t *Content = mpc_new("content");
-    mpc_parser_t *Template = mpc_new("template");
+    mpc_parser_t *symbol = mpc_new("symbol");
+    mpc_parser_t *text = mpc_new("text");
+    mpc_parser_t *expression = mpc_new("expression");
+    mpc_parser_t *statement = mpc_new("statement_open");
+    mpc_parser_t *statement_open = mpc_new("statement_open");
+    mpc_parser_t *statement_close = mpc_new("statement_close");
+    mpc_parser_t *comment = mpc_new("comment");
+    mpc_parser_t *for_statement = mpc_new("for");
+    mpc_parser_t *body = mpc_new("body");
+    mpc_parser_t *content = mpc_new("content");
+    mpc_parser_t *template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
         " symbol    : /[a-zA-Z_.]+/ ;"
-        " var       : \"{{\" /-? ?/ <symbol> / ?-?/ \"}}\" ;"
-        " block_open: /\{\% ?/ ;"
-        " block_close: / ?\%}/ ;"
+        " text      : /[^{][^{%#]*/ ;"
+        " expression : \"{{\" /-? */ <symbol> / *-?/ \"}}\" ;"
         " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
-        " for       : <block_open> \"for \" <symbol> \" in \" <symbol> <block_close> <body> <block_open> \"endfor\" <block_close> ;"
-        " text      : /[^{][^{%]*/ ;"
-        " content   : <var> | <for> | <text> | <comment>;"
+        " statement_open: \"{%\" /-? */;"
+        " statement_close: / *-?/ \"%}\";"
+        " for       : <statement_open> \"for \" <symbol> \" in \" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
+        " content   : <expression> | <for> | <text> | <comment>;"
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
-        Symbol, 
-        Var, 
-        Block_Open, 
-        Block_Close, 
-        Comment,
-        For, 
-        Text, 
-        Content, 
-        Body, 
-        Template, 
+        symbol, 
+        expression, 
+        statement_open, 
+        statement_close, 
+        comment,
+        for_statement, 
+        text, 
+        content, 
+        body, 
+        template, 
         NULL);
-    return Template;
+    return template;
 }
 
 char *template(char *tmpl, struct hashmap *ctx) {

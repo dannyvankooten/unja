@@ -11,6 +11,7 @@ struct node {
     struct node *next;
 };
 
+/* allocate a new hashmap */
 struct hashmap *hashmap_new() {
     struct hashmap *hm = malloc(sizeof *hm);
     if (!hm) err(EXIT_FAILURE, "out of memory");
@@ -21,6 +22,7 @@ struct hashmap *hashmap_new() {
     return hm;
 }
 
+/* insert key-value into hashmap */
 void hashmap_insert(struct hashmap *hm, char *key, void *value) {
     int pos = HASH(key);
     struct node *head = hm->buckets[pos];
@@ -41,6 +43,7 @@ void hashmap_insert(struct hashmap *hm, char *key, void *value) {
     hm->buckets[pos] = node;
 }
 
+/* retrieve value by key */
 void *hashmap_get(struct hashmap *hm, char *key) {
     int pos = HASH(key);
     struct node *node = hm->buckets[pos];
@@ -55,6 +58,7 @@ void *hashmap_get(struct hashmap *hm, char *key) {
     return NULL;
 }
 
+/* retrieve value by key, handles dot notation for nested hashmaps */
 void *hashmap_resolve(struct hashmap *hm, char *key) {
     char tmp_key[64];
     int i = 0;
@@ -83,6 +87,7 @@ void hashmap_remove(char *key) {
     // TODO: Implement this
 }
 
+/* free hashmap related memory */
 void hashmap_free(struct hashmap *hm) {
     struct node *node;
     struct node *next;

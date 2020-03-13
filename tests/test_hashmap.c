@@ -12,7 +12,6 @@ TEST(hashmap) {
     hashmap_free(hm);
 } 
 
-
 TEST(dot_notation) {
     struct hashmap *user = hashmap_new();
     hashmap_insert(user, "name", "Danny");
@@ -21,6 +20,7 @@ TEST(dot_notation) {
     assert(hashmap_resolve(hm, "user") == user, "expected user hashmap, got something else");
     char *value = (char *) hashmap_resolve(hm, "user.name");
     assert_str(value, "Danny");
+    hashmap_free(user);
     hashmap_free(hm);
 } 
 
