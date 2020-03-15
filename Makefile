@@ -1,13 +1,12 @@
-override CFLAGS+= -g -Wall -std=c11 -I.
-LIBS= 
+CFLAGS= -g -Wall -std=c99 -I.
+LDLIBS= 
 TESTFLAGS= $(CFLAGS) -Isrc/
+ifdef debug
+	CFLAGS+=-DDEBUG
+endif
 
-all: bin/hyde
-
+all: check
 bin:; mkdir -p bin/
-
-bin/hyde: src/hyde.c src/hashmap.c src/template.c src/vector.c vendor/mpc.c | bin
-	$(CC) $(CFLAGS) $^ -o $@
 
 bin/test_hashmap: src/hashmap.c tests/test_hashmap.c | bin
 	$(CC) $(TESTFLAGS) $^ -o $@

@@ -70,7 +70,7 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
             dest = trim_trailing_whitespace(dest);
         }
 
-        // set flag for next eval() to trim leading whitespace from text
+        /* set flag for next eval() to trim leading whitespace from text */
         if (strstr(t->children[3]->contents, "-")) {
             trim_whitespace = 1;
         }
