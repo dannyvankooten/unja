@@ -53,10 +53,16 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
         if (strstr(t->children[3]->contents, "-")) {
             trim_whitespace = 1;
         }
-
+        
         char *value = NULL;
-        char *key = t->children[2]->contents;
-        value = hashmap_resolve(ctx, key);
+        if (ctx  != NULL && strstr(t->children[2]->tag, "symbol")) {
+            char *key = t->children[2]->contents;
+            value = hashmap_resolve(ctx, key);
+        } else if(strstr(t->children[2]->tag, "number")) {
+            value = t->children[2]->contents;
+        } else if(strstr(t->children[2]->tag, "string")) {
+            value = t->children[2]->children[1]->contents;
+        }
         
         // TODO: Handle unexisting keys
         if  (value == NULL) {
@@ -66,7 +72,7 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
         return 0;
     }
 
-    if (strstr(t->tag, "content|for")) {
+    if (strstr(t->tag, "content|statement|for")) {
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
         struct vector *list = hashmap_resolve(ctx, iterator_key);
@@ -97,34 +103,52 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
 mpc_parser_t *parser_init() {
     mpc_parser_t *symbol = mpc_new("symbol");
+    mpc_parser_t *number = mpc_new("number");
+    mpc_parser_t *string = mpc_new("string");
     mpc_parser_t *text = mpc_new("text");
     mpc_parser_t *expression = mpc_new("expression");
-    mpc_parser_t *statement = mpc_new("statement_open");
+    mpc_parser_t *comment = mpc_new("comment");
+    mpc_parser_t *statement = mpc_new("statement");
     mpc_parser_t *statement_open = mpc_new("statement_open");
     mpc_parser_t *statement_close = mpc_new("statement_close");
-    mpc_parser_t *comment = mpc_new("comment");
-    mpc_parser_t *for_statement = mpc_new("for");
+    mpc_parser_t *statement_for = mpc_new("for");
+    mpc_parser_t *statement_if = mpc_new("if");
+    mpc_parser_t *statement_block = mpc_new("block");
+    mpc_parser_t *statement_extends = mpc_new("extends");
     mpc_parser_t *body = mpc_new("body");
     mpc_parser_t *content = mpc_new("content");
     mpc_parser_t *template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
         " symbol    : /[a-zA-Z_.]+/ ;"
+        " number    : /[0-9]+/ ;"
+        " string    : '\"' /([^\"])*/ '\"' ;"
         " text      : /[^{][^{%#]*/ ;"
-        " expression : \"{{\" /-? */ <symbol> / *-?/ \"}}\" ;"
+        " expression : \"{{\" /-? */ (<symbol> | <number> | <string> ) / *-?/ \"}}\" ;"
         " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: \"{%\" /-? */;"
         " statement_close: / *-?/ \"%}\";"
         " for       : <statement_open> \"for \" <symbol> \" in \" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
-        " content   : <expression> | <for> | <text> | <comment>;"
+        " block     : <statement_open> \"block \" <statement_close> <statement_open> \"endblock\" <statement_close>;"
+        " extends   : <statement_open> \"extends \" <statement_close>;"
+        /* TODO: Extend parser to include expression */
+        " if        : <statement_open> \"if \" <statement_close> <body> <statement_open> \"endif\" <statement_close> ;"
+        " statement : <for> | <block> | <extends> | <if> ;"
+        " content   : <expression> | <statement> | <text> | <comment>;"
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         symbol, 
+        number,
+        string,
         expression, 
+        text, 
+        comment,
         statement_open, 
         statement_close, 
-        comment,
-        for_statement, 
-        text, 
+        statement,
+        statement_if,
+        statement_for, 
+        statement_block,
+        statement_extends,
         content, 
         body, 
         template, 

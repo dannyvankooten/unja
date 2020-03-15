@@ -10,7 +10,21 @@ TEST(text_only) {
     free(output);
 }
 
-TEST(var) {
+TEST(expr_number) {
+    char *input = "Hello {{ 5 }}.";
+    char *output = template(input, NULL);
+    assert_str(output, "Hello 5.");
+    free(output);
+}
+
+TEST(expr_string) {
+    char *input = "Hello {{ \"world\" }}.";
+    char *output = template(input, NULL);
+    assert_str(output, "Hello world.");
+    free(output);
+}
+
+TEST(expr_symbol) {
     char *input = "Hello {{name}}.";
     struct hashmap *ctx = hashmap_new();
     hashmap_insert(ctx, "name", "world");
