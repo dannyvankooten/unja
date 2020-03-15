@@ -23,4 +23,4 @@ This is nowhere near being stable right now.
 
 ### License
 
-Unlicensed (to be decided).
+MIT
