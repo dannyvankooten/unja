@@ -58,16 +58,17 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
         if (ctx  != NULL && strstr(t->children[2]->tag, "symbol")) {
             char *key = t->children[2]->contents;
             value = hashmap_resolve(ctx, key);
+
+            // TODO: Handle unexisting keys
+            if  (value == NULL) {
+                return 1;
+            }
         } else if(strstr(t->children[2]->tag, "number")) {
             value = t->children[2]->contents;
         } else if(strstr(t->children[2]->tag, "string")) {
             value = t->children[2]->children[1]->contents;
         }
         
-        // TODO: Handle unexisting keys
-        if  (value == NULL) {
-            return 1;
-        }
         strcat(dest, value);
         return 0;
     }
