@@ -40,9 +40,30 @@ char *trim_leading_whitespace(char *str) {
     return str;
 }
 
+char *eval_expression(mpc_ast_t* node, struct hashmap *ctx) {
+    if (strstr(node->tag, "symbol")) {
+        /* Return empty string if no context was passed. Should probably signal error here. */
+        if (ctx == NULL) {
+           return "";
+        }
+
+        char *key = node->contents;
+        /* TODO: Handle unexisting symbols (returns NULL currently) */
+        return hashmap_resolve(ctx, key);
+    } else if(strstr(node->tag, "number")) {
+        return node->contents;
+    } else if(strstr(node->tag, "string")) {
+        return node->children[1]->contents;
+    }
+
+    return NULL;
+}
+
 int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
     static int trim_whitespace = 0;
+    char buf[64];
 
+    // eval expression
     if (strstr(t->tag, "content|expression|")) {
         // maybe eat whitespace going backward
         if (strstr(t->children[1]->contents, "-")) {
@@ -54,22 +75,35 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
             trim_whitespace = 1;
         }
         
-        char *value = NULL;
-        if (ctx  != NULL && strstr(t->children[2]->tag, "symbol")) {
-            char *key = t->children[2]->contents;
-            value = hashmap_resolve(ctx, key);
+        mpc_ast_t *left_node = t->children[2];
+        char *lvalue = eval_expression(left_node, ctx);
 
-            // TODO: Handle unexisting keys
-            if  (value == NULL) {
-                return 1;
+        mpc_ast_t *op = t->children[4];
+        if (op != NULL && strstr(op->tag, "op")) {
+            mpc_ast_t *right_node = t->children[6];
+            char *rvalue = eval_expression(right_node, ctx);
+
+            /* if operator is + and either left or right node is of type string: concat */
+            if (op->contents[0] == '+' && (strstr(left_node->tag, "string") || strstr(right_node->tag, "string"))) {
+                sprintf(buf, "%s%s", lvalue, rvalue);
+            } else {
+                /* eval int infix expression */
+                int result;
+                switch (op->contents[0]) {
+                    case '+': result = atoi(lvalue) + atoi(rvalue); break;
+                    case '-': result = atoi(lvalue) - atoi(rvalue); break;
+                    case '/': result = atoi(lvalue) / atoi(rvalue); break;
+                    case '*': result = atoi(lvalue) * atoi(rvalue); break;
+                    case '>': result = atoi(lvalue) > atoi(rvalue); break;
+                    case '<': result = atoi(lvalue) < atoi(rvalue); break;
+                }
+                sprintf(buf, "%d", result);
             }
-        } else if(strstr(t->children[2]->tag, "number")) {
-            value = t->children[2]->contents;
-        } else if(strstr(t->children[2]->tag, "string")) {
-            value = t->children[2]->children[1]->contents;
+            strcat(dest, buf);
+            return 0;
         }
-        
-        strcat(dest, value);
+
+        strcat(dest, lvalue);    
         return 0;
     }
 
@@ -106,6 +140,7 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *symbol = mpc_new("symbol");
     mpc_parser_t *number = mpc_new("number");
     mpc_parser_t *string = mpc_new("string");
+    mpc_parser_t *op = mpc_new("op");
     mpc_parser_t *text = mpc_new("text");
     mpc_parser_t *expression = mpc_new("expression");
     mpc_parser_t *comment = mpc_new("comment");
@@ -123,8 +158,9 @@ mpc_parser_t *parser_init() {
         " symbol    : /[a-zA-Z_.]+/ ;"
         " number    : /[0-9]+/ ;"
         " string    : '\"' /([^\"])*/ '\"' ;"
+        " op        : '+' | '-' | '*' | '/' | '>' | '<';"
         " text      : /[^{][^{%#]*/ ;"
-        " expression : \"{{\" /-? */ (<symbol> | <number> | <string> ) / *-?/ \"}}\" ;"
+        " expression : \"{{\" /-? */ (<symbol> | <number> | <string> ) (/ */ <op> / */ (<symbol> | <number> | <string> ))? / *-?/ \"}}\" ;"
         " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: \"{%\" /-? */;"
         " statement_close: / *-?/ \"%}\";"
@@ -138,6 +174,7 @@ mpc_parser_t *parser_init() {
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         symbol, 
+        op,
         number,
         string,
         expression, 
