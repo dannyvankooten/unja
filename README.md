@@ -7,7 +7,7 @@ This is nowhere near being stable right now.
 
 ### Example
 
-```
+```html+jinja
 {% extends "base.html" %}
 
 {% block title %}Members{% endblock %}
