@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "cstdio": "cpp",
+        "mpc.h": "c",
+        "stdio.h": "c",
+        "typeinfo": "c",
+        "template.h": "c",
+        "test.h": "c",
+        "stdlib.h": "c",
+        "list": "c",
+        "hashmap.h": "c"
+    }
+}

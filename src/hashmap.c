@@ -22,16 +22,18 @@ struct hashmap *hashmap_new() {
     return hm;
 }
 
-/* insert key-value into hashmap */
-void hashmap_insert(struct hashmap *hm, char *key, void *value) {
+/* Inserts a key-value pair into the map. Returns NULL if map did not have key, old value if it did. */
+void *hashmap_insert(struct hashmap *hm, char *key, void *value) {
     int pos = HASH(key);
     struct node *head = hm->buckets[pos];
     struct node *node = head;
+    void *old_value;
 
     while (node) {
         if (strcmp(node->key, key) == 0) {
+            old_value = node->value;
             node->value = value;
-            return;
+            return old_value;
         }
         node = node->next;
     }
@@ -41,9 +43,10 @@ void hashmap_insert(struct hashmap *hm, char *key, void *value) {
     node->value = value;
     node->next = head;
     hm->buckets[pos] = node;
+    return NULL;
 }
 
-/* retrieve value by key */
+/* Returns a pointer to the value corresponding to the key. */
 void *hashmap_get(struct hashmap *hm, char *key) {
     int pos = HASH(key);
     struct node *node = hm->buckets[pos];
@@ -58,7 +61,7 @@ void *hashmap_get(struct hashmap *hm, char *key) {
     return NULL;
 }
 
-/* retrieve value by key, handles dot notation for nested hashmaps */
+/* Retrieve pointer to value by key, handles dot notation for nested hashmaps */
 void *hashmap_resolve(struct hashmap *hm, char *key) {
     char tmp_key[64];
     int i = 0;
@@ -83,8 +86,30 @@ void *hashmap_resolve(struct hashmap *hm, char *key) {
     return hm;
 }
 
-void hashmap_remove(char *key) {
-    // TODO: Implement this
+/* Removes a key from the map, returning the value at the key if the key was previously in the map. */
+void *hashmap_remove(struct hashmap *hm, char *key) {
+    int pos = HASH(key);
+    struct node *node = hm->buckets[pos];
+    struct node *prev = NULL;
+    void *old_value;
+
+    while (node) {
+        if (strcmp(node->key, key) == 0) {
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                hm->buckets[pos] = node->next;
+            }
+            old_value = node->value;
+            free(node);            
+            return old_value;
+        }
+
+        node = node->next;
+        prev = node;
+    }
+
+    return NULL;
 }
 
 /* free hashmap related memory */
