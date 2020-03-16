@@ -1,3 +1,5 @@
 hyde 
 *.dSYM
 bin/
+.vscode
+vgcore.*

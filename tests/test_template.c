@@ -145,10 +145,36 @@ TEST(var_dot_notation) {
 }
 
 TEST(comments) {
-    char *input = "Hello {# comment here #} world.";
+    char *input = "Hello {# comment here #}world.";
     char *output = template(input, NULL);
-    assert_str(output, "Hello  world.");
+    assert_str(output, "Hello world.");
     free(output);
+}
+
+
+TEST(if_block) {
+
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 5 > 10 %}OK{% endif %}.", "."},
+        {"{% if 10 > 5 %}OK{% endif %}.", "OK."},
+        {"{% if foobar %}OK{% endif %}.", "."},
+        {"{% if name %}OK{% endif %}.", "OK."},
+        {"{% if age > 10 %}OK{% endif %}.", "OK."},
+    };
+
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "name", "Danny");
+    hashmap_insert(ctx, "age", "29");
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template(tests[i].input, ctx);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+
+    hashmap_free(ctx);
 }
 
 END_TESTS 
