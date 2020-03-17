@@ -256,6 +256,11 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 }
 
 mpc_parser_t *parser_init() {
+    static mpc_parser_t *template;
+    if (template != NULL) {
+        return template;
+    }
+
     mpc_parser_t *symbol = mpc_new("symbol");
     mpc_parser_t *number = mpc_new("number");
     mpc_parser_t *string = mpc_new("string");
@@ -273,7 +278,7 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *statement_extends = mpc_new("extends");
     mpc_parser_t *body = mpc_new("body");
     mpc_parser_t *content = mpc_new("content");
-    mpc_parser_t *template = mpc_new("template");
+    template = mpc_new("template");
     mpca_lang(MPCA_LANG_DEFAULT,
         " symbol    : /[a-zA-Z][a-zA-Z0-9_.]*/ ;"
         " number    : /[0-9]+/ ;"
