@@ -151,18 +151,42 @@ TEST(comments) {
     free(output);
 }
 
-
 TEST(if_block) {
 
     struct {
         char *input;
         char *expected_output;
     } tests[] = {
-        {"{% if 5 > 10 %}OK{% endif %}.", "."},
-        {"{% if 10 > 5 %}OK{% endif %}.", "OK."},
-        {"{% if foobar %}OK{% endif %}.", "."},
-        {"{% if name %}OK{% endif %}.", "OK."},
-        {"{% if age > 10 %}OK{% endif %}.", "OK."},
+        {"{% if 5 > 10 %}1{% endif %}.", "."},
+        {"{% if 10 > 5 %}1{% endif %}.", "1."},
+        {"{% if foobar %}1{% endif %}.", "."},
+        {"{% if name %}1{% endif %}.", "1."},
+        {"{% if age > 10 %}1{% endif %}.", "1."},
+    };
+
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "name", "Danny");
+    hashmap_insert(ctx, "age", "29");
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template(tests[i].input, ctx);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+
+    hashmap_free(ctx);
+}
+
+TEST(if_else_block) {
+
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 5 > 10 %}1{% else %}2{% endif %}", "2"},
+        {"{% if 10 > 5 %}1{% else %}2{% endif %}", "1"},
+        {"{% if foobar %}1{% else %}2{% endif %}", "2"},
+        {"{% if name %}1{% else %}2{% endif %}", "1"},
+        {"{% if age < 10 %}1{% else %}2{% endif %}", "2"},
     };
 
     struct hashmap *ctx = hashmap_new();

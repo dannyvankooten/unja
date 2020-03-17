@@ -231,6 +231,10 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
         if (object_is_truthy(result)) {
             eval(dest, t->children[4], ctx);
+        } else {
+            if (t->children_num > 8) {
+                eval(dest, t->children[8], ctx);
+            }
         }
 
         object_free(result);
@@ -293,8 +297,7 @@ mpc_parser_t *parser_init() {
         " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
         " block     : <statement_open> \"block \" <statement_close> <statement_open> \"endblock\" <statement_close>;"
         " extends   : <statement_open> \"extends \" <statement_close>;"
-        /* TODO: Extend parser to include expression */
-        " if        : <statement_open> \"if \" <expression> <statement_close> <body> <statement_open> \"endif\" <statement_close> ;"
+        " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
         " statement : <for> | <block> | <extends> | <if> ;"
         " content   : <print> | <statement> | <text> | <comment>;"
         " body      : <content>* ;"
