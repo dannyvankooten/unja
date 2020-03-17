@@ -215,6 +215,14 @@ TEST(buffer_alloc) {
     free(output);
 }
 
+TEST(directory) {
+    struct env *env = env_new("./tests/data/01/");
+    char *output = render(env, "child.tmpl", NULL);
+    assert_str(output, "Header\n\nChild content\n\nFooter");
+    free(output);
+    env_free(env);
+}
+
 
 
 END_TESTS 

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
+#include <unistd.h>
+#include <dirent.h>
 #include "vendor/mpc.h"
 #include "template.h"
 
@@ -26,6 +28,11 @@ struct buffer {
     char *string;
 };
 
+struct env {
+    struct hashmap *templates;
+};
+
+/* ensure buffer has room for a string sized l, grows buffer capacity if needed */
 void buffer_reserve(struct buffer *buf, int l) {
     int req_size = buf->size + l;
     if (req_size >= buf->cap) {
@@ -40,14 +47,44 @@ void buffer_reserve(struct buffer *buf, int l) {
     }
 }
 
+struct env *env_new(char *dirname) {
+    DIR *dr = opendir(dirname); 
+    if (dr == NULL) { 
+        err(EXIT_FAILURE, "could not open directory %s", dirname); 
+    } 
+  
+    struct env *env = malloc(sizeof *env);
+    env->templates = hashmap_new();
+    chdir(dirname);
+
+    struct dirent *de;   
+    while ((de = readdir(dr)) != NULL) {
+        // skip files starting with a dot
+        if (de->d_name[0] == '.') {
+            continue;
+        }
+
+        char *name = de->d_name;
+        char *tmpl = read_file(name);
+        hashmap_insert(env->templates, name, tmpl);
+    }
+  
+    closedir(dr);     
+    return env;
+}
+
+void env_free(struct env *env) {
+    // TODO: Free template strings
+    free(env);
+}
+
 char *read_file(char *filename) {
     char *input = malloc(BUFSIZ);
     unsigned int size = 0;
 
     FILE *f = fopen(filename, "r");
     if (!f) {
-        printf("Could not open \"%s\" for reading", filename);
-        exit(1);
+        err(EXIT_FAILURE, "Could not open \"%s\" for reading", filename);
     }
 
     unsigned int read = 0;
@@ -217,6 +254,20 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct hashmap *ctx) {
 int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
     static int trim_whitespace = 0;
 
+
+    if (strstr(t->tag, "content|statement|extends")) {
+        char *template_name = t->children[2]->children[1]->contents;
+        // TODO: Render given template instead
+        // but replace blocks with blocks in current template
+        return 0;
+    }
+
+
+    if (strstr(t->tag, "content|statement|block")) {
+        char *block_name = t->children[2]->contents;
+        return eval(buf, t->children[4], ctx);
+    }
+
     // eval print statement
     if (strstr(t->tag, "content|print")) {
         // maybe eat whitespace going backward
@@ -275,8 +326,11 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
         return 0;
     }
 
-    for (int i=0; i < t->children_num; i++) {
-        eval(buf, t->children[i], ctx);
+
+    if (strstr(t->tag, ">")) {
+        for (int i=0; i < t->children_num; i++) {
+            eval(buf, t->children[i], ctx);
+        }
     }
     
     return 0;
@@ -318,7 +372,7 @@ mpc_parser_t *parser_init() {
         " statement_open: \"{%\" /-? */;"
         " statement_close: / *-?/ \"%}\";"
         " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
-        " block     : <statement_open> \"block \" <symbol> <statement_close> <statement_open> \"endblock\" <statement_close>;"
+        " block     : <statement_open> \"block \" <symbol> <statement_close> <body> <statement_open> \"endblock\" <statement_close>;"
         " extends   : <statement_open> \"extends \" <string> <statement_close>;"
         " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
         " statement : <for> | <block> | <extends> | <if> ;"
@@ -375,3 +429,7 @@ char *template(char *tmpl, struct hashmap *ctx) {
     return buf.string;
 }
 
+char *render(struct env *env, char *template_name, struct hashmap *ctx) {
+    char *tmpl = hashmap_get(env->templates, template_name);
+    return template(tmpl, ctx);
+}
