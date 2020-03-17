@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <err.h>
 #include "vendor/mpc.h"
 #include "template.h"
 
@@ -26,9 +27,16 @@ struct buffer {
 };
 
 void buffer_reserve(struct buffer *buf, int l) {
-     if (buf->size + l >= buf->cap) {
-        buf->cap *= 2;
-        buf->string = realloc(buf->string, buf->size + l);
+    int req_size = buf->size + l;
+    if (req_size >= buf->cap) {
+        while (req_size >= buf->cap) {
+            buf->cap *= 2;
+        }
+        
+        buf->string = realloc(buf->string, buf->cap * sizeof *buf->string);
+        if (!buf->string) {
+            err(EXIT_FAILURE, "out of memory");
+        }
     }
 }
 
