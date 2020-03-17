@@ -7,7 +7,7 @@
 #define END_TESTS }
 #define TEST(name) strcpy(current_test, #name);
 #define assert_null(actual) _assert(actual == NULL, __FILE__, __LINE__, "invalid value: expected NULL, got %s", actual)
-#define assert_str(actual, expected) _assert(actual != NULL && strcmp(actual, expected) == 0, __FILE__, __LINE__, "invalid string: expected %s, got %s", expected, actual)
+#define assert_str(actual, expected) _assert(actual != NULL && strcmp(actual, expected) == 0, __FILE__, __LINE__, "invalid string: expected \"%s\", got \"%s\"", expected, actual)
 #define assert(assertion, format, ...) _assert(assertion, __FILE__, __LINE__, format, ##__VA_ARGS__)
 #define ARRAY_SIZE(arr) sizeof arr / sizeof arr[0]
 

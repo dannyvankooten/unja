@@ -114,18 +114,18 @@ TEST(expr_whitespace) {
 }
 
 TEST(for_block) {
-    char *input = "{% for n in numbers %}{{ n }}, {% endfor %}";
+    char *input = "{% for n in names %}{{ n }}, {% endfor %}";
     struct hashmap *ctx = hashmap_new();
 
-    struct vector *numbers = vector_new(3);
-    vector_push(numbers, "1");
-    vector_push(numbers, "2");
-    vector_push(numbers, "3");
-    hashmap_insert(ctx, "numbers", numbers);
+    struct vector *names = vector_new(9);
+    vector_push(names, "John");
+    vector_push(names, "Sally");
+    vector_push(names, "Eric");
+    hashmap_insert(ctx, "names", names);
 
     char *output = template(input, ctx);
-    assert_str(output, "1, 2, 3, ");
-    vector_free(numbers);
+    assert_str(output, "John, Sally, Eric, ");
+    vector_free(names);
     hashmap_free(ctx);
     free(output);
 }
@@ -200,5 +200,21 @@ TEST(if_else_block) {
 
     hashmap_free(ctx);
 }
+
+TEST(buffer_alloc) {
+    /* Output a string so that output buffer is longer than template buffer, 
+        to test dynamic allocation */
+    char *input = "{{ n }}";
+    struct hashmap *ctx = hashmap_new();
+    char *text = "Lorem ipsum dolor sit amet.";
+    hashmap_insert(ctx, "n", text);
+
+    char *output = template(input, ctx);
+    assert_str(output, text);
+    hashmap_free(ctx);
+    free(output);
+}
+
+
 
 END_TESTS 

@@ -3,6 +3,35 @@
 #include "vendor/mpc.h"
 #include "template.h"
 
+enum unja_object_type {
+    OBJ_NULL,
+    OBJ_INT,
+    OBJ_STRING,
+};
+
+struct unja_object {
+    enum unja_object_type type;
+    int integer;
+    char *string;
+};
+
+struct unja_object null_object = { 
+    .type = OBJ_NULL,
+};
+
+struct buffer {
+    int size;
+    int cap;
+    char *string;
+};
+
+void buffer_reserve(struct buffer *buf, int l) {
+     if (buf->size + l >= buf->cap) {
+        buf->cap *= 2;
+        buf->string = realloc(buf->string, buf->size + l);
+    }
+}
+
 char *read_file(char *filename) {
     char *input = malloc(BUFSIZ);
     unsigned int size = 0;
@@ -40,23 +69,6 @@ char *trim_leading_whitespace(char *str) {
     return str;
 }
 
-enum unja_object_type {
-    OBJ_NULL,
-    OBJ_INT,
-    OBJ_STRING,
-};
-
-struct unja_object {
-    enum unja_object_type type;
-    int integer;
-    char *string;
-};
-
-struct unja_object _null_object = { 
-    .type = OBJ_NULL,
-};
-struct unja_object *null_object = &_null_object;
-
 struct unja_object *make_string_object(char *value, char *value2) {
     struct unja_object *obj = malloc(sizeof *obj);
     obj->type = OBJ_STRING;
@@ -82,18 +94,20 @@ struct unja_object *make_int_object(int value) {
 }
 
 
-void object_to_str(char *dest, struct unja_object *obj) {
-    char buf[64];
+void eval_object(struct buffer *buf, struct unja_object *obj) {
+    char tmp[64];
 
     switch (obj->type) {
         case OBJ_NULL: 
             break;
         case OBJ_STRING:
-            strcat(dest, obj->string);
+            buffer_reserve(buf, strlen(obj->string));
+            strcat(buf->string, obj->string);
             break;
         case OBJ_INT: 
-            sprintf(buf, "%d", obj->integer);
-            strcat(dest, buf);
+            sprintf(tmp, "%d", obj->integer);
+            buffer_reserve(buf, strlen(tmp));
+            strcat(buf->string, tmp);
             break;
     }
 }
@@ -134,7 +148,7 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct hashmap *ctx) 
     if (strstr(node->tag, "symbol|")) {
         /* Return empty string if no context was passed. Should probably signal error here. */
         if (ctx == NULL) {
-           return null_object;
+           return &null_object;
         }
 
         char *key = node->contents;
@@ -142,7 +156,7 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct hashmap *ctx) 
 
         /* TODO: Handle unexisting symbols (returns NULL currently) */
         if (value == NULL) {
-            return null_object;
+            return &null_object;
         }
         return make_string_object(value, NULL);
     } else if(strstr(node->tag, "number|")) {
@@ -151,7 +165,7 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct hashmap *ctx) 
         return make_string_object(node->children[1]->contents, NULL);
     }
 
-    return null_object;
+    return &null_object;
 }
 
 
@@ -192,14 +206,14 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct hashmap *ctx) {
     return eval_expression_value(left_node, ctx);
 }
 
-int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
+int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
     static int trim_whitespace = 0;
 
     // eval print statement
     if (strstr(t->tag, "content|print")) {
         // maybe eat whitespace going backward
         if (strstr(t->children[1]->contents, "-")) {
-            dest = trim_trailing_whitespace(dest);
+            buf->string = trim_trailing_whitespace(buf->string);
         }
 
         /* set flag for next eval() to trim leading whitespace from text */
@@ -209,7 +223,7 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
 
         mpc_ast_t *expr = t->children[2];      
         struct unja_object *obj = eval_expression(expr, ctx);  
-        object_to_str(dest, obj);
+        eval_object(buf, obj);
         object_free(obj);
         return 0;
     }
@@ -220,7 +234,7 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
         struct vector *list = hashmap_resolve(ctx, iterator_key);
         for (int i=0; i < list->size; i++) {
             hashmap_insert(ctx, tmp_key, list->values[i]);
-            eval(dest, t->children[6], ctx);
+            eval(buf, t->children[6], ctx);
         }
         return 0;
     }
@@ -230,10 +244,10 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
         struct unja_object *result = eval_expression(expr, ctx);
 
         if (object_is_truthy(result)) {
-            eval(dest, t->children[4], ctx);
+            eval(buf, t->children[4], ctx);
         } else {
             if (t->children_num > 8) {
-                eval(dest, t->children[8], ctx);
+                eval(buf, t->children[8], ctx);
             }
         }
 
@@ -248,12 +262,13 @@ int eval(char *dest, mpc_ast_t* t, struct hashmap *ctx) {
             trim_whitespace = 0;
         }
 
-        strcat(dest, str);
+        buffer_reserve(buf, strlen(str));
+        strcat(buf->string, str);
         return 0;
     }
 
     for (int i=0; i < t->children_num; i++) {
-        eval(dest, t->children[i], ctx);
+        eval(buf, t->children[i], ctx);
     }
     
     return 0;
@@ -295,8 +310,8 @@ mpc_parser_t *parser_init() {
         " statement_open: \"{%\" /-? */;"
         " statement_close: / *-?/ \"%}\";"
         " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
-        " block     : <statement_open> \"block \" <statement_close> <statement_open> \"endblock\" <statement_close>;"
-        " extends   : <statement_open> \"extends \" <statement_close>;"
+        " block     : <statement_open> \"block \" <symbol> <statement_close> <statement_open> \"endblock\" <statement_close>;"
+        " extends   : <statement_open> \"extends \" <string> <statement_close>;"
         " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
         " statement : <for> | <block> | <extends> | <if> ;"
         " content   : <print> | <statement> | <text> | <comment>;"
@@ -341,13 +356,14 @@ char *template(char *tmpl, struct hashmap *ctx) {
     printf("\n");
     #endif
         
-    // FIXME: Allocate precisely
-    char *output = malloc(strlen(tmpl) * 4);
-    output[0] = '\0';
+    struct buffer buf;
+    buf.size = 0;
+    buf.cap = strlen(tmpl) + 1;
+    buf.string = malloc(buf.size);
+    buf.string[0] = '\0';
+    eval(&buf, r.output, ctx);
 
-    eval(output, r.output, ctx);
     mpc_ast_delete(r.output);
-
-    return output;
+    return buf.string;
 }
 
