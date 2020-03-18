@@ -3,6 +3,7 @@
 #include <err.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <string.h>
 #include "vendor/mpc.h"
 #include "template.h"
 
@@ -167,9 +168,13 @@ struct env *env_new(char *dirname) {
             continue;
         }
 
-        char *name = de->d_name;
+        // copy template name as closedir free's it otherwise
+        char *name = malloc(strlen(de->d_name) + 1);
+        strcpy(name, de->d_name);
+
         char *tmpl = read_file(name);
         mpc_ast_t *ast = parse(tmpl);
+        free(tmpl);
 
         struct template *t = malloc(sizeof *t);
         t->ast = ast;
@@ -182,14 +187,24 @@ struct env *env_new(char *dirname) {
         }
 
         hashmap_insert(env->templates, name, t);
+        
     }
   
     closedir(dr);     
     return env;
 }
 
+void template_free(void *v) {
+    struct template *t = (struct template *)v;
+    hashmap_free(t->blocks);
+    mpc_ast_delete(t->ast);
+    free(t->name);
+    free(t);
+}
+
 void env_free(struct env *env) {
-    // TODO: Free template strings
+    hashmap_walk(env->templates, template_free);
+    hashmap_free(env->templates);
     free(env);
 }
 
@@ -215,7 +230,7 @@ char *read_file(char *filename) {
 }
 
 char *trim_trailing_whitespace(char *str) {
-    for (int i=strlen(str)-1; isspace(str[i]); i--) {
+    for (int i=strlen(str)-1; i >= 0 && isspace(str[i]); i--) {
         str[i] = '\0';
     }
     return str;

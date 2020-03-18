@@ -51,7 +51,7 @@ void *hashmap_get(struct hashmap *hm, char *key) {
     int pos = HASH(key);
     struct node *node = hm->buckets[pos];
     while (node) {
-        if (strcmp(node->key, key) == 0) {
+        if (node->key && strcmp(node->key, key) == 0) {
             return node->value;
         }
 
@@ -110,6 +110,20 @@ void *hashmap_remove(struct hashmap *hm, char *key) {
     }
 
     return NULL;
+}
+
+void hashmap_walk(struct hashmap *hm, void (*fn)(void *value)) {
+    struct node *node;
+    struct node *next;
+
+    for (int i=0; i < HASHMAP_CAP; i++) {
+        node = hm->buckets[i];
+        while (node) {
+            next = node->next;
+            fn(node->value);
+            node = next;
+        }
+    }
 }
 
 /* free hashmap related memory */

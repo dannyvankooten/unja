@@ -182,14 +182,13 @@ TEST(for_block_whitespace) {
 
 TEST(var_dot_notation) {
     char *input = "Hello {{user.name}}!";
-     struct hashmap *user = hashmap_new();
-    hashmap_insert(user, "name", "Danny");
-
     struct hashmap *ctx = hashmap_new();
+    struct hashmap *user = hashmap_new();
+    hashmap_insert(user, "name", "Danny");
     hashmap_insert(ctx, "user", user);
-    
     char *output = template_string(input, ctx);
     assert_str(output, "Hello Danny!");
+    hashmap_free(user);
     hashmap_free(ctx);
     free(output);
 }
