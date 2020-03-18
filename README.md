@@ -1,9 +1,10 @@
-Unja
-=====
+Unja  [![Build Status](https://img.shields.io/travis/dannyvankooten/unja/master)](https://travis-ci.org/dannyvankooten/unja)
+ [![License: MIT](https://img.shields.io/github/license/dannyvankooten/unja)](https://github.com/dannyvankooten/unja/blob/master/LICENSE)
+==========
 
-Unja is (an attempt at) a template engine for C, inspired by Jinja and Liquid.
+A template engine for C, inspired by Jinja and Liquid. 
 
-This is nowhere near being stable right now.
+**This is nowhere near being stable right now!**
 
 ### Example
 
