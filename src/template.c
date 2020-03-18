@@ -32,6 +32,13 @@ struct env {
     struct hashmap *templates;
 };
 
+struct template {
+    char *name;
+    mpc_ast_t *ast;
+    struct hashmap *blocks;
+    char *parent;
+};
+
 /* ensure buffer has room for a string sized l, grows buffer capacity if needed */
 void buffer_reserve(struct buffer *buf, int l) {
     int req_size = buf->size + l;
@@ -44,6 +51,96 @@ void buffer_reserve(struct buffer *buf, int l) {
         if (!buf->string) {
             err(EXIT_FAILURE, "out of memory");
         }
+    }
+}
+
+
+mpc_parser_t *parser_init() {
+    static mpc_parser_t *template;
+    if (template != NULL) {
+        return template;
+    }
+
+    mpc_parser_t *symbol = mpc_new("symbol");
+    mpc_parser_t *number = mpc_new("number");
+    mpc_parser_t *string = mpc_new("string");
+    mpc_parser_t *op = mpc_new("op");
+    mpc_parser_t *text = mpc_new("text");
+    mpc_parser_t *print = mpc_new("print");
+    mpc_parser_t *expression = mpc_new("expression");
+    mpc_parser_t *comment = mpc_new("comment");
+    mpc_parser_t *statement = mpc_new("statement");
+    mpc_parser_t *statement_open = mpc_new("statement_open");
+    mpc_parser_t *statement_close = mpc_new("statement_close");
+    mpc_parser_t *statement_for = mpc_new("for");
+    mpc_parser_t *statement_if = mpc_new("if");
+    mpc_parser_t *statement_block = mpc_new("block");
+    mpc_parser_t *statement_extends = mpc_new("extends");
+    mpc_parser_t *body = mpc_new("body");
+    mpc_parser_t *content = mpc_new("content");
+    template = mpc_new("template");
+    mpca_lang(MPCA_LANG_DEFAULT,
+        " symbol    : /[a-zA-Z][a-zA-Z0-9_.]*/ ;"
+        " number    : /[0-9]+/ ;"
+        " string    : '\"' /([^\"])*/ '\"' ;"
+        " op        : '+' | '-' | '*' | '/' | '>' | '<';"
+        " text      : /[^{][^{%#]*/ ;"
+        " expression: (<symbol> | <number> | <string>) (<op> (<symbol> | <number> | <string>))* ;"
+        " print     : \"{{\" /-? */ <expression> / *-?/ \"}}\" ;"
+        " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
+        " statement_open: \"{%\" /-? */;"
+        " statement_close: / *-?/ \"%}\";"
+        " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
+        " block     : <statement_open> \"block \" <symbol> <statement_close> <body> <statement_open> \"endblock\" <statement_close>;"
+        " extends   : <statement_open> \"extends \" <string> <statement_close>;"
+        " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
+        " statement : <for> | <block> | <extends> | <if> ;"
+        " content   : <print> | <statement> | <text> | <comment>;"
+        " body      : <content>* ;"
+        " template  : /^/ <body> /$/ ;",
+        symbol, 
+        op,
+        number,
+        string,
+        print,
+        expression, 
+        text, 
+        comment,
+        statement_open, 
+        statement_close, 
+        statement,
+        statement_if,
+        statement_for, 
+        statement_block,
+        statement_extends,
+        content, 
+        body, 
+        template, 
+        NULL);
+    return template;
+}
+
+mpc_ast_t *parse(char *tmpl) {
+    mpc_parser_t *parser = parser_init();
+    mpc_result_t r;
+
+    if (!mpc_parse("input", tmpl, parser, &r)) {
+        mpc_err_print(r.error);
+        mpc_err_delete(r.error);
+        return NULL;
+    }
+
+    return r.output;
+}
+
+struct hashmap *find_blocks_in_ast(mpc_ast_t *node, struct hashmap *map) {
+    if (strstr(node->tag, "content|statement|block")) {
+        char *name = node->children[2]->contents;
+        hashmap_insert(map, name, node);
+    }
+
+    for (int i=0; i < node->children_num; i++) {
+        find_blocks_in_ast(node->children[i], map);
     }
 }
 
@@ -66,7 +163,19 @@ struct env *env_new(char *dirname) {
 
         char *name = de->d_name;
         char *tmpl = read_file(name);
-        hashmap_insert(env->templates, name, tmpl);
+        mpc_ast_t *ast = parse(tmpl);
+
+        struct template *t = malloc(sizeof *t);
+        t->ast = ast;
+        t->name = name;
+        t->blocks = find_blocks_in_ast(ast, hashmap_new());
+        t->parent = NULL;
+
+        if (ast->children_num > 1 && ast->children[1]->children_num > 0 && strstr(ast->children[1]->children[0]->tag, "content|statement|extends")) {
+            t->parent = ast->children[1]->children[0]->children[2]->children[1]->contents;
+        }
+
+        hashmap_insert(env->templates, name, t);
     }
   
     closedir(dr);     
@@ -326,110 +435,45 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
         return 0;
     }
 
-
-    if (strstr(t->tag, ">")) {
-        for (int i=0; i < t->children_num; i++) {
-            eval(buf, t->children[i], ctx);
-        }
+    for (int i=0; i < t->children_num; i++) {
+        eval(buf, t->children[i], ctx);
     }
-    
+
     return 0;
 }
 
-mpc_parser_t *parser_init() {
-    static mpc_parser_t *template;
-    if (template != NULL) {
-        return template;
-    }
-
-    mpc_parser_t *symbol = mpc_new("symbol");
-    mpc_parser_t *number = mpc_new("number");
-    mpc_parser_t *string = mpc_new("string");
-    mpc_parser_t *op = mpc_new("op");
-    mpc_parser_t *text = mpc_new("text");
-    mpc_parser_t *print = mpc_new("print");
-    mpc_parser_t *expression = mpc_new("expression");
-    mpc_parser_t *comment = mpc_new("comment");
-    mpc_parser_t *statement = mpc_new("statement");
-    mpc_parser_t *statement_open = mpc_new("statement_open");
-    mpc_parser_t *statement_close = mpc_new("statement_close");
-    mpc_parser_t *statement_for = mpc_new("for");
-    mpc_parser_t *statement_if = mpc_new("if");
-    mpc_parser_t *statement_block = mpc_new("block");
-    mpc_parser_t *statement_extends = mpc_new("extends");
-    mpc_parser_t *body = mpc_new("body");
-    mpc_parser_t *content = mpc_new("content");
-    template = mpc_new("template");
-    mpca_lang(MPCA_LANG_DEFAULT,
-        " symbol    : /[a-zA-Z][a-zA-Z0-9_.]*/ ;"
-        " number    : /[0-9]+/ ;"
-        " string    : '\"' /([^\"])*/ '\"' ;"
-        " op        : '+' | '-' | '*' | '/' | '>' | '<';"
-        " text      : /[^{][^{%#]*/ ;"
-        " expression: (<symbol> | <number> | <string>) (<op> (<symbol> | <number> | <string>))* ;"
-        " print     : \"{{\" /-? */ <expression> / *-?/ \"}}\" ;"
-        " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
-        " statement_open: \"{%\" /-? */;"
-        " statement_close: / *-?/ \"%}\";"
-        " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
-        " block     : <statement_open> \"block \" <symbol> <statement_close> <body> <statement_open> \"endblock\" <statement_close>;"
-        " extends   : <statement_open> \"extends \" <string> <statement_close>;"
-        " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
-        " statement : <for> | <block> | <extends> | <if> ;"
-        " content   : <print> | <statement> | <text> | <comment>;"
-        " body      : <content>* ;"
-        " template  : /^/ <body> /$/ ;",
-        symbol, 
-        op,
-        number,
-        string,
-        print,
-        expression, 
-        text, 
-        comment,
-        statement_open, 
-        statement_close, 
-        statement,
-        statement_if,
-        statement_for, 
-        statement_block,
-        statement_extends,
-        content, 
-        body, 
-        template, 
-        NULL);
-    return template;
-}
-
-char *template(char *tmpl, struct hashmap *ctx) {
-    mpc_parser_t *parser = parser_init();
-    mpc_result_t r;
-
-    if (!mpc_parse("input", tmpl, parser, &r)) {
-        mpc_err_print(r.error);
-        mpc_err_delete(r.error);
-        return NULL;
-    }
-
+char *render_ast(mpc_ast_t *ast, struct hashmap *ctx) {
     #if DEBUG
-    printf("Template: %s\n", tmpl);
-    printf("AST: ");
-    mpc_ast_print(r.output);
+    printf("AST: \n");
+    mpc_ast_print(ast);
     printf("\n");
     #endif
-        
+
     struct buffer buf;
     buf.size = 0;
-    buf.cap = strlen(tmpl) + 1;
-    buf.string = malloc(buf.size);
+    buf.cap = 256;
+    buf.string = malloc(buf.cap);
     buf.string[0] = '\0';
-    eval(&buf, r.output, ctx);
-
-    mpc_ast_delete(r.output);
+    eval(&buf, ast, ctx);
     return buf.string;
 }
 
-char *render(struct env *env, char *template_name, struct hashmap *ctx) {
-    char *tmpl = hashmap_get(env->templates, template_name);
-    return template(tmpl, ctx);
+char *template_string(char *tmpl, struct hashmap *ctx) {
+    #if DEBUG
+    printf("Template: %s\n", tmpl);
+    #endif
+    mpc_ast_t *ast = parse(tmpl);        
+    char *output = render_ast(ast, ctx);
+    mpc_ast_delete(ast);
+    return output;
+}
+
+char *template(struct env *env, char *template_name, struct hashmap *ctx) {
+    struct template *t = hashmap_get(env->templates, template_name);
+
+    #if DEBUG
+    printf("Template name: %s\n", t->name);
+    printf("Parent: %s\n", t->parent ? t->parent : "None");
+    #endif
+    return render_ast(t->ast, ctx);
 }
