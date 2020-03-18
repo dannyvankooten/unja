@@ -218,7 +218,7 @@ TEST(buffer_alloc) {
 TEST(inheritance) {
     struct env *env = env_new("./tests/data/01/");
     char *output = template(env, "child.tmpl", NULL);
-    assert_str(output, "Header\n\n\nChild content\n\n\n\nFooter\n");
+    assert_str(output, "Header\nChild content\nFooter\n");
     free(output);
     env_free(env);
 }

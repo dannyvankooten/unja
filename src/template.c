@@ -376,35 +376,44 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     static int trim_whitespace = 0;
 
     // maybe eat whitespace going backward
-    if (t->children_num > 0 && strstr(t->children[0]->contents, "{{-")) {
+    if (t->children_num > 0 && strstr(t->children[0]->contents, "-")) {
         buf->string = trim_trailing_whitespace(buf->string);
     }
 
+    if (strstr(t->tag, "content|text")) {
+        char *str = t->contents;
+        if (trim_whitespace) {
+            str = trim_leading_whitespace(str);
+            trim_whitespace = 0;
+        }
+
+        buffer_reserve(buf, strlen(str));
+        strcat(buf->string, str);
+        return 0;
+    }
+
     if (strstr(t->tag, "content|statement|block")) {
+        trim_whitespace = strstr(t->children[3]->contents, "-") ? 1 : 0;
         char *block_name = t->children[2]->contents;
         
         // find block in "lowest" template
         struct template *templ = ctx->current_template;
         mpc_ast_t *block = hashmap_get(templ->blocks, block_name);
         if (block) {
-            return eval(buf, block->children[4], ctx);
+            eval(buf, block->children[4], ctx);
+        } else {
+            /* TODO: Keep looking for block in parent templates */
+            // just render this block if it wasn't found in any of the lower templates
+            eval(buf, t->children[4], ctx);
         }
 
-        /* TODO: Keep looking for block in parent templates */
-
-        // just render this block if it wasn't found in any of the lower templates
-        return eval(buf, t->children[4], ctx);
+        trim_whitespace = strstr(t->children[7]->contents, "-") ? 1 : 0;
+        return 0;
     }
 
     // eval print statement
     if (strstr(t->tag, "content|print")) {
-       
-
-        /* set flag for next eval() to trim leading whitespace from text */
-        if (strstr(t->children[2]->contents, "-}}")) {
-            trim_whitespace = 1;
-        }
-
+        trim_whitespace = strstr(t->children[2]->contents, "-") ? 1 : 0;
         mpc_ast_t *expr = t->children[1];      
         struct unja_object *obj = eval_expression(expr, ctx);  
         eval_object(buf, obj);
@@ -413,6 +422,7 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     }
 
     if (strstr(t->tag, "content|statement|for")) {
+        trim_whitespace = strstr(t->children[5]->contents, "-") ? 1 : 0;
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
         struct vector *list = hashmap_resolve(ctx->vars, iterator_key);
@@ -424,6 +434,7 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     }
 
     if (strstr(t->tag, "content|statement|if")) {
+        trim_whitespace = strstr(t->children[3]->contents, "-") ? 1 : 0;
         mpc_ast_t *expr = t->children[2];
         struct unja_object *result = eval_expression(expr, ctx);
 
@@ -436,18 +447,6 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
         }
 
         object_free(result);
-        return 0;
-    }
-
-    if (strstr(t->tag, "content|text")) {
-        char *str = t->contents;
-        if (trim_whitespace) {
-            str = trim_leading_whitespace(str);
-            trim_whitespace = 0;
-        }
-
-        buffer_reserve(buf, strlen(str));
-        strcat(buf->string, str);
         return 0;
     }
 
