@@ -50,7 +50,7 @@ void buffer_reserve(struct buffer *buf, int l) {
         
         buf->string = realloc(buf->string, buf->cap * sizeof *buf->string);
         if (!buf->string) {
-            err(EXIT_FAILURE, "out of memory");
+            errx(EXIT_FAILURE, "out of memory");
         }
     }
 }
@@ -152,9 +152,13 @@ struct hashmap *find_blocks_in_ast(mpc_ast_t *node, struct hashmap *map) {
 }
 
 struct env *env_new(char *dirname) {
+    /* store current working dir so we can revert to it after reading templates */
+    char working_dir[256];
+    getcwd(working_dir, 255);
+
     DIR *dr = opendir(dirname); 
     if (dr == NULL) { 
-        err(EXIT_FAILURE, "could not open directory %s", dirname); 
+        errx(EXIT_FAILURE, "could not open directory \"%s\"", dirname); 
     } 
   
     struct env *env = malloc(sizeof *env);
@@ -187,10 +191,10 @@ struct env *env_new(char *dirname) {
         }
 
         hashmap_insert(env->templates, name, t);
-        
     }
   
-    closedir(dr);     
+    closedir(dr); 
+    chdir(working_dir);    
     return env;
 }
 
@@ -214,7 +218,7 @@ char *read_file(char *filename) {
 
     FILE *f = fopen(filename, "r");
     if (!f) {
-        err(EXIT_FAILURE, "Could not open \"%s\" for reading", filename);
+        errx(EXIT_FAILURE, "could not open \"%s\" for reading", filename);
     }
 
     unsigned int read = 0;
@@ -414,11 +418,15 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
         // find block in "lowest" template
         struct template *templ = ctx->current_template;
         mpc_ast_t *block = hashmap_get(templ->blocks, block_name);
+        while (templ != NULL && block == NULL) {
+            templ = hashmap_get(ctx->env->templates, templ->parent);
+            block = hashmap_get(templ->blocks, block_name);
+        }
+        
         if (block) {
             eval(buf, block->children[4], ctx);
         } else {
-            /* TODO: Keep looking for block in parent templates */
-            // just render this block if it wasn't found in any of the lower templates
+            /* block not found in any lower template, so just render the one we got */
             eval(buf, t->children[4], ctx);
         }
 
@@ -540,7 +548,13 @@ char *template(struct env *env, char *template_name, struct hashmap *vars) {
 
     // find root template
     while (t->parent != NULL) {
-        t = hashmap_get(env->templates, t->parent);
+        char *parent_name = t->parent;
+        t = hashmap_get(env->templates, parent_name);
+
+        if (t == NULL) {
+            errx(EXIT_FAILURE, "template tried to extend unexisting parent \"%s\"", parent_name);
+            break;
+        }
     }
 
     return render_ast(t->ast, &ctx);

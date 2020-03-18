@@ -276,10 +276,20 @@ TEST(buffer_alloc) {
     free(output);
 }
 
-TEST(inheritance) {
-    struct env *env = env_new("./tests/data/01/");
-    char *output = template(env, "child.tmpl", NULL);
+TEST(inheritance_depth_1) {
+    /* TODO: Check why this fails with files names 1.tmpl */
+    struct env *env = env_new("./tests/data/inheritance-depth-1/");
+    char *output = template(env, "one.tmpl", NULL);
     assert_str(output, "Header\nChild content\nFooter\n");
+    free(output);
+    env_free(env);
+}
+
+
+TEST(inheritance_depth_2) {
+    struct env *env = env_new("./tests/data/inheritance-depth-2/");
+    char *output = template(env, "two.tmpl", NULL);
+    assert_str(output, "0\n1\n2\n");
     free(output);
     env_free(env);
 }
