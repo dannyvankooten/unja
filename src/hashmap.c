@@ -3,13 +3,24 @@
 #include <err.h>
 #include "hashmap.h"
 
-#define HASH(v) (v[0] - 'a') % HASHMAP_CAP
-
 struct node {
     char *key;
     void *value;
     struct node *next;
 };
+
+unsigned long
+hash(char *str)
+{
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
+
+    return hash;
+}
 
 /* allocate a new hashmap */
 struct hashmap *hashmap_new() {
@@ -24,7 +35,7 @@ struct hashmap *hashmap_new() {
 
 /* Inserts a key-value pair into the map. Returns NULL if map did not have key, old value if it did. */
 void *hashmap_insert(struct hashmap *hm, char *key, void *value) {
-    int pos = HASH(key);
+    int pos = hash(key) % HASHMAP_CAP;
     struct node *head = hm->buckets[pos];
     struct node *node = head;
     void *old_value;
@@ -48,10 +59,10 @@ void *hashmap_insert(struct hashmap *hm, char *key, void *value) {
 
 /* Returns a pointer to the value corresponding to the key. */
 void *hashmap_get(struct hashmap *hm, char *key) {
-    int pos = HASH(key);
+    unsigned int pos = hash(key) % HASHMAP_CAP;
     struct node *node = hm->buckets[pos];
-    while (node) {
-        if (node->key && strcmp(node->key, key) == 0) {
+    while (node != NULL) {
+        if (strcmp(node->key, key) == 0) {
             return node->value;
         }
 
@@ -88,7 +99,7 @@ void *hashmap_resolve(struct hashmap *hm, char *key) {
 
 /* Removes a key from the map, returning the value at the key if the key was previously in the map. */
 void *hashmap_remove(struct hashmap *hm, char *key) {
-    int pos = HASH(key);
+    int pos = hash(key) % HASHMAP_CAP;
     struct node *node = hm->buckets[pos];
     struct node *prev = NULL;
     void *old_value;
