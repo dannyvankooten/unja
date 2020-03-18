@@ -17,6 +17,13 @@ TEST(expr_number) {
     free(output);
 }
 
+TEST(expr_number_no_spaces) {
+    char *input = "Hello {{5}}.";
+    char *output = template_string(input, NULL);
+    assert_str(output, "Hello 5.");
+    free(output);
+}
+
 TEST(expr_string) {
     char *input = "Hello {{ \"world\" }}.";
     char *output = template_string(input, NULL);
@@ -24,7 +31,24 @@ TEST(expr_string) {
     free(output);
 }
 
+TEST(expr_string_no_spaces) {
+    char *input = "Hello {{\"world\"}}.";
+    char *output = template_string(input, NULL);
+    assert_str(output, "Hello world.");
+    free(output);
+}
+
 TEST(expr_symbol) {
+    char *input = "Hello {{ name }}.";
+    struct hashmap *ctx = hashmap_new();
+    hashmap_insert(ctx, "name", "world");
+    char *output = template_string(input, ctx);
+    assert_str(output, "Hello world.");
+    hashmap_free(ctx);
+    free(output);
+}
+
+TEST(expr_symbol_no_spaces) {
     char *input = "Hello {{name}}.";
     struct hashmap *ctx = hashmap_new();
     hashmap_insert(ctx, "name", "world");
@@ -43,6 +67,12 @@ TEST(expr_add) {
         {"{{ 5 + foo }}.", "15."},
         {"{{ \"foo\" + \"bar\" }}", "foobar"},
         {"{{ \"Hello \" + name }}", "Hello Danny"},
+        {"{{5+5}}", "10"},
+        {"{{ 5+5}}", "10"},
+        {"{{ 5 +5}}", "10"},
+        {"{{ 5 +5}}", "10"},
+        {"{{ 5 + 5}}", "10"},
+        {"{{ 5 + 5 }}", "10"},
     };
 
     struct hashmap *ctx = hashmap_new();
@@ -104,12 +134,16 @@ TEST(expr_lt) {
 }
 
 TEST(expr_whitespace) {
-    char *input = "Hello \n{{-name -}}\n.";
-    struct hashmap *ctx = hashmap_new();
-    hashmap_insert(ctx, "name", "world");
-    char *output = template_string(input, ctx);
+    char *input = "Hello \n{{- \"world\" -}}\n.";
+    char *output = template_string(input, NULL);
     assert_str(output, "Helloworld.");
-    hashmap_free(ctx);
+    free(output);
+}
+
+TEST(expr_op_whitespace) {
+    char *input = "\n{{- 5 + 5 -}}\n";
+    char *output = template_string(input, NULL);
+    assert_str(output, "10");
     free(output);
 }
 
@@ -130,6 +164,22 @@ TEST(for_block) {
     free(output);
 }
 
+TEST(for_block_whitespace) {
+    char *input = "\n{%- for n in names -%}\n{{ n }}\n{%- endfor -%}\n";
+    struct hashmap *ctx = hashmap_new();
+
+    struct vector *names = vector_new(2);
+    vector_push(names, "John");
+    vector_push(names, "Sally");
+    hashmap_insert(ctx, "names", names);
+
+    char *output = template_string(input, ctx);
+    assert_str(output, "John\nSally");
+    vector_free(names);
+    hashmap_free(ctx);
+    free(output);
+}
+
 TEST(var_dot_notation) {
     char *input = "Hello {{user.name}}!";
      struct hashmap *user = hashmap_new();
@@ -144,7 +194,7 @@ TEST(var_dot_notation) {
     free(output);
 }
 
-TEST(comments) {
+TEST(comment) {
     char *input = "Hello {# comment here #}world.";
     char *output = template_string(input, NULL);
     assert_str(output, "Hello world.");
@@ -152,7 +202,6 @@ TEST(comments) {
 }
 
 TEST(if_block) {
-
     struct {
         char *input;
         char *expected_output;
@@ -176,8 +225,14 @@ TEST(if_block) {
     hashmap_free(ctx);
 }
 
-TEST(if_else_block) {
+TEST(if_block_whitespace) {
+    char *input = "\n{%- if 10 > 5 -%}\nOK\n{%- endif -%}\n";
+    char *output = template_string(input, NULL);
+    assert_str(output, "OK");
+    free(output);
+}
 
+TEST(if_else_block) {
     struct {
         char *input;
         char *expected_output;
@@ -199,6 +254,13 @@ TEST(if_else_block) {
     }
 
     hashmap_free(ctx);
+}
+
+TEST(if_else_block_whitespace) {
+    char *input = "\n{%- if 5 > 10 -%}NOT OK{% else -%}\nOK\n{%- endif -%}\n";
+    char *output = template_string(input, NULL);
+    assert_str(output, "OK");
+    free(output);
 }
 
 TEST(buffer_alloc) {

@@ -82,7 +82,7 @@ mpc_parser_t *parser_init() {
 
     template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
-        " spaces     : (' ')*;"
+        " spaces    : / */ ;"
         " symbol    : /[a-zA-Z][a-zA-Z0-9_.]*/ ;"
         " number    : /[0-9]+/ ;"
         " text      : /[^{][^{%#]*/;"
@@ -90,7 +90,7 @@ mpc_parser_t *parser_init() {
         " op        : '+' | '-' | '*' | '/' | '>' | '<';"
         " expression: (<symbol> | <number> | <string>) (<spaces> <op> <spaces> (<symbol> | <number> | <string>))* ;"
         " print     : (/{{2}-? */) <expression> / *-?}}/ ;"
-        " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
+        " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: /{\%-? */;"
         " statement_close: / *-?\%}/;"
         " for       : <statement_open> \"for \" <symbol> \" in \" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
@@ -422,27 +422,50 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     }
 
     if (strstr(t->tag, "content|statement|for")) {
-        trim_whitespace = strstr(t->children[5]->contents, "-") ? 1 : 0;
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
         struct vector *list = hashmap_resolve(ctx->vars, iterator_key);
         for (int i=0; i < list->size; i++) {
             hashmap_insert(ctx->vars, tmp_key, list->values[i]);
+            trim_whitespace = strstr(t->children[5]->contents, "-") ? 1 : 0;
             eval(buf, t->children[6], ctx);
         }
+
+        /* trim trailing whitespace if closing tag has minus sign */
+        if (strstr(t->children[7]->contents, "-")) {
+            buf->string = trim_trailing_whitespace(buf->string);
+        }
+        
+        trim_whitespace = strstr(t->children[9]->contents, "-") ? 1 : 0;
         return 0;
     }
 
     if (strstr(t->tag, "content|statement|if")) {
-        trim_whitespace = strstr(t->children[3]->contents, "-") ? 1 : 0;
         mpc_ast_t *expr = t->children[2];
         struct unja_object *result = eval_expression(expr, ctx);
 
         if (object_is_truthy(result)) {
+            trim_whitespace = strstr(t->children[3]->contents, "-") ? 1 : 0;
+
             eval(buf, t->children[4], ctx);
+
+            /* trim trailing whitespace if closing tag has minus sign */
+            if (strstr(t->children[5]->contents, "-")) {
+                buf->string = trim_trailing_whitespace(buf->string);
+            }
+
+            trim_whitespace = strstr(t->children[7]->contents, "-") ? 1 : 0;
         } else {
             if (t->children_num > 8) {
+                trim_whitespace = strstr(t->children[7]->contents, "-") ? 1 : 0;
                 eval(buf, t->children[8], ctx);
+
+                 /* trim trailing whitespace if closing tag has minus sign */
+                if (strstr(t->children[9]->contents, "-")) {
+                    buf->string = trim_trailing_whitespace(buf->string);
+                }
+
+                trim_whitespace = strstr(t->children[11]->contents, "-") ? 1 : 0;
             }
         }
 
