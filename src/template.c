@@ -61,6 +61,7 @@ mpc_parser_t *parser_init() {
         return template;
     }
 
+    mpc_parser_t *spaces = mpc_new("spaces");
     mpc_parser_t *symbol = mpc_new("symbol");
     mpc_parser_t *number = mpc_new("number");
     mpc_parser_t *string = mpc_new("string");
@@ -78,19 +79,21 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *statement_extends = mpc_new("extends");
     mpc_parser_t *body = mpc_new("body");
     mpc_parser_t *content = mpc_new("content");
+
     template = mpc_new("template");
-    mpca_lang(MPCA_LANG_DEFAULT,
+    mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
+        " spaces     : (' ')*;"
         " symbol    : /[a-zA-Z][a-zA-Z0-9_.]*/ ;"
         " number    : /[0-9]+/ ;"
+        " text      : /[^{][^{%#]*/;"
         " string    : '\"' /([^\"])*/ '\"' ;"
         " op        : '+' | '-' | '*' | '/' | '>' | '<';"
-        " text      : /[^{][^{%#]*/ ;"
-        " expression: (<symbol> | <number> | <string>) (<op> (<symbol> | <number> | <string>))* ;"
-        " print     : \"{{\" /-? */ <expression> / *-?/ \"}}\" ;"
+        " expression: (<symbol> | <number> | <string>) (<spaces> <op> <spaces> (<symbol> | <number> | <string>))* ;"
+        " print     : (/{{2}-? */) <expression> / *-?}}/ ;"
         " comment : \"{#\" /[^#][^#}]*/ \"#}\" ;"
-        " statement_open: \"{%\" /-? */;"
-        " statement_close: / *-?/ \"%}\";"
-        " for       : <statement_open> \"for \" <symbol> \"in\" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
+        " statement_open: /{\%-? */;"
+        " statement_close: / *-?\%}/;"
+        " for       : <statement_open> \"for \" <symbol> \" in \" <symbol> <statement_close> <body> <statement_open> \"endfor\" <statement_close> ;"
         " block     : <statement_open> \"block \" <symbol> <statement_close> <body> <statement_open> \"endblock\" <statement_close>;"
         " extends   : <statement_open> \"extends \" <string> <statement_close>;"
         " if        : <statement_open> \"if \" <expression> <statement_close> <body> (<statement_open> \"else\" <statement_close> <body>)? <statement_open> \"endif\" <statement_close> ;"
@@ -98,13 +101,14 @@ mpc_parser_t *parser_init() {
         " content   : <print> | <statement> | <text> | <comment>;"
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
+        spaces,
         symbol, 
         op,
+        text,
         number,
         string,
         print,
         expression, 
-        text, 
         comment,
         statement_open, 
         statement_close, 
@@ -115,8 +119,8 @@ mpc_parser_t *parser_init() {
         statement_extends,
         content, 
         body, 
-        template, 
-        NULL);
+        template);
+
     return template;
 }
 
@@ -142,6 +146,8 @@ struct hashmap *find_blocks_in_ast(mpc_ast_t *node, struct hashmap *map) {
     for (int i=0; i < node->children_num; i++) {
         find_blocks_in_ast(node->children[i], map);
     }
+
+    return map;
 }
 
 struct env *env_new(char *dirname) {
@@ -298,15 +304,21 @@ int object_is_truthy(struct unja_object *obj) {
     return 0;
 }
 
-struct unja_object *eval_expression_value(mpc_ast_t* node, struct hashmap *ctx) {
+struct context {
+    struct hashmap *vars;
+    struct env *env;
+    struct template *current_template;
+};
+
+struct unja_object *eval_expression_value(mpc_ast_t* node, struct context *ctx) {
     if (strstr(node->tag, "symbol|")) {
-        /* Return empty string if no context was passed. Should probably signal error here. */
-        if (ctx == NULL) {
+        /* Return empty string if no vars were passed. Should probably signal error here. */
+        if (ctx->vars == NULL) {
            return &null_object;
         }
 
         char *key = node->contents;
-        char *value = hashmap_resolve(ctx, key);
+        char *value = hashmap_resolve(ctx->vars, key);
 
         /* TODO: Handle unexisting symbols (returns NULL currently) */
         if (value == NULL) {
@@ -323,11 +335,11 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct hashmap *ctx) 
 }
 
 
-struct unja_object *eval_expression(mpc_ast_t* expr, struct hashmap *ctx) {
-    if (expr->children_num >= 2 && strstr(expr->children[1]->tag, "op")) {
+struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
+    if (expr->children_num >= 4 && strstr(expr->children[2]->tag, "op")) {
         mpc_ast_t *left_node = expr->children[0];
-        mpc_ast_t *op = expr->children[1];
-        mpc_ast_t *right_node = expr->children[2];
+        mpc_ast_t *op = expr->children[2];
+        mpc_ast_t *right_node = expr->children[4];
 
         struct unja_object *left = eval_expression_value(left_node, ctx);
         struct unja_object *right = eval_expression_value(right_node, ctx);
@@ -360,36 +372,40 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct hashmap *ctx) {
     return eval_expression_value(left_node, ctx);
 }
 
-int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
+int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     static int trim_whitespace = 0;
 
-
-    if (strstr(t->tag, "content|statement|extends")) {
-        char *template_name = t->children[2]->children[1]->contents;
-        // TODO: Render given template instead
-        // but replace blocks with blocks in current template
-        return 0;
+    // maybe eat whitespace going backward
+    if (t->children_num > 0 && strstr(t->children[0]->contents, "{{-")) {
+        buf->string = trim_trailing_whitespace(buf->string);
     }
-
 
     if (strstr(t->tag, "content|statement|block")) {
         char *block_name = t->children[2]->contents;
+        
+        // find block in "lowest" template
+        struct template *templ = ctx->current_template;
+        mpc_ast_t *block = hashmap_get(templ->blocks, block_name);
+        if (block) {
+            return eval(buf, block->children[4], ctx);
+        }
+
+        /* TODO: Keep looking for block in parent templates */
+
+        // just render this block if it wasn't found in any of the lower templates
         return eval(buf, t->children[4], ctx);
     }
 
     // eval print statement
     if (strstr(t->tag, "content|print")) {
-        // maybe eat whitespace going backward
-        if (strstr(t->children[1]->contents, "-")) {
-            buf->string = trim_trailing_whitespace(buf->string);
-        }
+       
 
         /* set flag for next eval() to trim leading whitespace from text */
-        if (strstr(t->children[3]->contents, "-")) {
+        if (strstr(t->children[2]->contents, "-}}")) {
             trim_whitespace = 1;
         }
 
-        mpc_ast_t *expr = t->children[2];      
+        mpc_ast_t *expr = t->children[1];      
         struct unja_object *obj = eval_expression(expr, ctx);  
         eval_object(buf, obj);
         object_free(obj);
@@ -399,9 +415,9 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
     if (strstr(t->tag, "content|statement|for")) {
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
-        struct vector *list = hashmap_resolve(ctx, iterator_key);
+        struct vector *list = hashmap_resolve(ctx->vars, iterator_key);
         for (int i=0; i < list->size; i++) {
-            hashmap_insert(ctx, tmp_key, list->values[i]);
+            hashmap_insert(ctx->vars, tmp_key, list->values[i]);
             eval(buf, t->children[6], ctx);
         }
         return 0;
@@ -442,7 +458,8 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct hashmap *ctx) {
     return 0;
 }
 
-char *render_ast(mpc_ast_t *ast, struct hashmap *ctx) {
+
+char *render_ast(mpc_ast_t *ast, struct context *ctx) {
     #if DEBUG
     printf("AST: \n");
     mpc_ast_print(ast);
@@ -458,22 +475,36 @@ char *render_ast(mpc_ast_t *ast, struct hashmap *ctx) {
     return buf.string;
 }
 
-char *template_string(char *tmpl, struct hashmap *ctx) {
+char *template_string(char *tmpl, struct hashmap *vars) {
     #if DEBUG
     printf("Template: %s\n", tmpl);
     #endif
-    mpc_ast_t *ast = parse(tmpl);        
-    char *output = render_ast(ast, ctx);
+    mpc_ast_t *ast = parse(tmpl);    
+    struct context ctx;
+    ctx.vars = vars;
+    ctx.env = NULL;
+    ctx.current_template = NULL;    
+    char *output = render_ast(ast, &ctx);
     mpc_ast_delete(ast);
     return output;
 }
 
-char *template(struct env *env, char *template_name, struct hashmap *ctx) {
+char *template(struct env *env, char *template_name, struct hashmap *vars) {
     struct template *t = hashmap_get(env->templates, template_name);
 
     #if DEBUG
     printf("Template name: %s\n", t->name);
     printf("Parent: %s\n", t->parent ? t->parent : "None");
     #endif
-    return render_ast(t->ast, ctx);
+    struct context ctx;
+    ctx.vars = vars;
+    ctx.env = env;
+    ctx.current_template = t;    
+
+    // find root template
+    while (t->parent != NULL) {
+        t = hashmap_get(env->templates, t->parent);
+    }
+
+    return render_ast(t->ast, &ctx);
 }

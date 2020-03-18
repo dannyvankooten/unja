@@ -215,14 +215,12 @@ TEST(buffer_alloc) {
     free(output);
 }
 
-TEST(directory) {
+TEST(inheritance) {
     struct env *env = env_new("./tests/data/01/");
     char *output = template(env, "child.tmpl", NULL);
-    assert_str(output, "Header\n\nChild content\n\nFooter");
+    assert_str(output, "Header\n\n\nChild content\n\n\n\nFooter\n");
     free(output);
     env_free(env);
 }
-
-
 
 END_TESTS 
