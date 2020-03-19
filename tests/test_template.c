@@ -89,6 +89,27 @@ TEST(expr_add) {
     hashmap_free(ctx);
 }
 
+
+TEST(expr_op_precedence) {
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{{ 5 * 2 + 1 }}.", "11."},
+        {"{{ 1 +  5 * 2 }}.", "11."},
+        {"{{ 10 / 2 + 1 }}.", "6."},
+        {"{{ 1 + 10 / 2 }}.", "6."},
+    };
+
+    struct hashmap *ctx = hashmap_new();
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, ctx);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+    hashmap_free(ctx);
+}
+
 TEST(expr_subtract) {
     char *input = "Hello {{ 5 - 5 }}.";
     char *output = template_string(input, NULL);
@@ -211,6 +232,7 @@ TEST(if_block) {
         {"{% if foobar %}1{% endif %}.", "."},
         {"{% if name %}1{% endif %}.", "1."},
         {"{% if age > 10 %}1{% endif %}.", "1."},
+        {"{% if 10+1 > 10 %}1{% endif %}.", "1."},
     };
 
     struct hashmap *ctx = hashmap_new();

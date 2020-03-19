@@ -92,9 +92,9 @@ mpc_parser_t *parser_init() {
         " string    : '\"' /([^\"])*/ '\"' ;"
         " op        : '+' | '-' | '*' | '/' | '>' | '<';"
         " factor    : '(' <expression> ')' | <symbol> | <number> | <string> ;"
-        " term      : <spaces> <factor> <spaces> (('*' | '/' | '%') <spaces> <factor> <spaces>)* ;"
-        " expression: <term> (('+' | '-') <term>)* ;"
-        " print     : /{{2}-?/ <expression> /-?}}/ ;"
+        " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* ;"
+        " expression: <term> (<spaces> ('+' | '-' | '>' | '<') <spaces> <term>)* ;"
+        " print     : /{{2}-? */ <expression> / *-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: /{\%-? */;"
         " statement_close: / *-?\%}/;"
@@ -385,24 +385,24 @@ struct unja_object *eval_infix_expression(struct unja_object *left, char *op, st
 struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
 
     /* singular term */
-    if (strstr(expr->tag, "term")) {
-        return eval_expression_value(expr->children[1], ctx);
+    if (expr->children_num == 0 || strstr(expr->tag, "string|")) {
+        return eval_expression_value(expr, ctx);
     }
 
     /* otherwise: with operator */
     int offset = 0; 
-    struct object *result;
-    mpc_ast_t *left_node = expr->children[0]->children[1];
-    struct unja_object *left = eval_expression_value(left_node, ctx);
+    struct unja_object *result;
+    mpc_ast_t *left_node = expr->children[0];
+    struct unja_object *left = eval_expression(left_node, ctx);
 
     while (offset < expr->children_num - 1) {
-        mpc_ast_t *op = expr->children[offset+1];
-        mpc_ast_t *right_node = expr->children[offset+2]->children[1];
-        struct unja_object *right = eval_expression_value(right_node, ctx);
+        mpc_ast_t *op = expr->children[offset+2];
+        mpc_ast_t *right_node = expr->children[offset+4];
+        struct unja_object *right = eval_expression(right_node, ctx);
         result = eval_infix_expression(left, op->contents, right);
 
         left = result;
-        offset += 2;
+        offset += 4;
     }
 
     return result;
@@ -411,10 +411,6 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
 
 int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     static int trim_whitespace = 0;
-
-    #if DEBUG
-    printf("Node: %s = %s\n", t->tag, t->contents);
-    #endif
 
     // maybe eat whitespace going backward
     if (t->children_num > 0 && strstr(t->children[0]->contents, "-")) {
