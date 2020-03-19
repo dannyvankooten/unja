@@ -80,6 +80,8 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *statement_extends = mpc_new("extends");
     mpc_parser_t *body = mpc_new("body");
     mpc_parser_t *content = mpc_new("content");
+    mpc_parser_t *factor = mpc_new("factor");
+    mpc_parser_t *term = mpc_new("term");
 
     template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
@@ -89,8 +91,10 @@ mpc_parser_t *parser_init() {
         " text      : /[^{][^{%#]*/;"
         " string    : '\"' /([^\"])*/ '\"' ;"
         " op        : '+' | '-' | '*' | '/' | '>' | '<';"
-        " expression: (<symbol> | <number> | <string>) (<spaces> <op> <spaces> (<symbol> | <number> | <string>))* ;"
-        " print     : (/{{2}-? */) <expression> / *-?}}/ ;"
+        " factor    : '(' <expression> ')' | <symbol> | <number> | <string> ;"
+        " term      : <spaces> <factor> <spaces> (('*' | '/' | '%') <spaces> <factor> <spaces>)* ;"
+        " expression: <term> (('+' | '-') <term>)* ;"
+        " print     : /{{2}-?/ <expression> /-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: /{\%-? */;"
         " statement_close: / *-?\%}/;"
@@ -103,6 +107,7 @@ mpc_parser_t *parser_init() {
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         spaces,
+        factor, term,
         symbol, 
         op,
         text,
@@ -353,46 +358,63 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct context *ctx) 
     return &null_object;
 }
 
-
-struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
-    if (expr->children_num >= 4 && strstr(expr->children[2]->tag, "op")) {
-        mpc_ast_t *left_node = expr->children[0];
-        mpc_ast_t *op = expr->children[2];
-        mpc_ast_t *right_node = expr->children[4];
-
-        struct unja_object *left = eval_expression_value(left_node, ctx);
-        struct unja_object *right = eval_expression_value(right_node, ctx);
-
-        /* if operator is + and either left or right node is of type string: concat */
-        if (op->contents[0] == '+' && (left->type == OBJ_STRING && right->type == OBJ_STRING)) {           
-           struct unja_object *result = make_string_object(left->string, right->string);
-           object_free(left);
-           object_free(right);
-           return result;
-        } 
-
-        /* eval int infix expression */
-        int result;
-        switch (op->contents[0]) {
-            case '+': result = object_to_int(left) + object_to_int(right); break;
-            case '-': result = object_to_int(left) - object_to_int(right); break;
-            case '/': result = object_to_int(left) / object_to_int(right); break;
-            case '*': result = object_to_int(left) * object_to_int(right); break;
-            case '>': result = object_to_int(left) > object_to_int(right); break;
-            case '<': result = object_to_int(left) < object_to_int(right); break;
-        }
-
+struct unja_object *eval_infix_expression(struct unja_object *left, char *op, struct unja_object *right) {
+    /* if operator is + and either left or right node is of type string: concat */
+    if (op[0] == '+' && (left->type == OBJ_STRING && right->type == OBJ_STRING)) {           
+        struct unja_object *result = make_string_object(left->string, right->string);
         object_free(left);
         object_free(right);
-        return make_int_object(result);
+        return result;
+    } 
+
+    int result;
+    switch (op[0]) {
+        case '+': result = object_to_int(left) + object_to_int(right); break;
+        case '-': result = object_to_int(left) - object_to_int(right); break;
+        case '/': result = object_to_int(left) / object_to_int(right); break;
+        case '*': result = object_to_int(left) * object_to_int(right); break;
+        case '>': result = object_to_int(left) > object_to_int(right); break;
+        case '<': result = object_to_int(left) < object_to_int(right); break;
     }
 
-    mpc_ast_t *left_node = expr;
-    return eval_expression_value(left_node, ctx);
+    object_free(left);
+    object_free(right);
+    return make_int_object(result);
+}
+
+struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
+
+    /* singular term */
+    if (strstr(expr->tag, "term")) {
+        return eval_expression_value(expr->children[1], ctx);
+    }
+
+    /* otherwise: with operator */
+    int offset = 0; 
+    struct object *result;
+    mpc_ast_t *left_node = expr->children[0]->children[1];
+    struct unja_object *left = eval_expression_value(left_node, ctx);
+
+    while (offset < expr->children_num - 1) {
+        mpc_ast_t *op = expr->children[offset+1];
+        mpc_ast_t *right_node = expr->children[offset+2]->children[1];
+        struct unja_object *right = eval_expression_value(right_node, ctx);
+        result = eval_infix_expression(left, op->contents, right);
+
+        left = result;
+        offset += 2;
+    }
+
+    return result;
+   
 }
 
 int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     static int trim_whitespace = 0;
+
+    #if DEBUG
+    printf("Node: %s = %s\n", t->tag, t->contents);
+    #endif
 
     // maybe eat whitespace going backward
     if (t->children_num > 0 && strstr(t->children[0]->contents, "-")) {
