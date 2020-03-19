@@ -66,7 +66,6 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *symbol = mpc_new("symbol");
     mpc_parser_t *number = mpc_new("number");
     mpc_parser_t *string = mpc_new("string");
-    mpc_parser_t *op = mpc_new("op");
     mpc_parser_t *text = mpc_new("text");
     mpc_parser_t *print = mpc_new("print");
     mpc_parser_t *expression = mpc_new("expression");
@@ -90,9 +89,9 @@ mpc_parser_t *parser_init() {
         " number    : /[0-9]+/ ;"
         " text      : /[^{][^{%#]*/;"
         " string    : '\"' /([^\"])*/ '\"' ;"
-        " op        : '+' | '-' | '*' | '/' | '>' | '<';"
         " factor    : '(' <expression> ')' | <symbol> | <number> | <string> ;"
         " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* ;"
+        /* TODO: move > and < to lower predence grammar group */
         " expression: <term> (<spaces> ('+' | '-' | '>' | '<') <spaces> <term>)* ;"
         " print     : /{{2}-? */ <expression> / *-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
@@ -109,7 +108,6 @@ mpc_parser_t *parser_init() {
         spaces,
         factor, term,
         symbol, 
-        op,
         text,
         number,
         string,
