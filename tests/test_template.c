@@ -3,7 +3,7 @@
 
 START_TESTS 
 
-TEST(text_only) {
+TEST(textvc_only) {
     char *input = "Hello world.";
     char *output = template_string(input, NULL);
     assert_str(output, "Hello world.");
@@ -89,7 +89,6 @@ TEST(expr_add) {
     hashmap_free(ctx);
 }
 
-
 TEST(expr_op_precedence) {
     struct {
         char *input;
@@ -157,6 +156,28 @@ TEST(for_block) {
 
     char *output = template_string(input, ctx);
     assert_str(output, "John, Sally, Eric, ");
+    vector_free(names);
+    hashmap_free(ctx);
+    free(output);
+}
+
+
+TEST(for_block_vars) {
+    char *input = "{% for n in names %}"
+                  "{{loop.index + 1}}: {{ n }}"
+                  "{% if loop.first %} <--{% endif %}"
+                  "{% if not loop.last %}\n{% endif %}"
+                  "{% endfor %}";
+    struct hashmap *ctx = hashmap_new();
+
+    struct vector *names = vector_new(9);
+    vector_push(names, "John");
+    vector_push(names, "Sally");
+    vector_push(names, "Eric");
+    hashmap_insert(ctx, "names", names);
+
+    char *output = template_string(input, ctx);
+    assert_str(output, "1: John <--\n2: Sally\n3: Eric");
     vector_free(names);
     hashmap_free(ctx);
     free(output);
@@ -292,7 +313,6 @@ TEST(expr_lte) {
     }
 }
 
-
 TEST(expr_eq) {
    struct {
         char *input;
@@ -412,14 +432,12 @@ TEST(buffer_alloc) {
 }
 
 TEST(inheritance_depth_1) {
-    /* TODO: Check why this fails with files names 1.tmpl */
     struct env *env = env_new("./tests/data/inheritance-depth-1/");
     char *output = template(env, "one.tmpl", NULL);
     assert_str(output, "Header\nChild content\nFooter\n");
     free(output);
     env_free(env);
 }
-
 
 TEST(inheritance_depth_2) {
     struct env *env = env_new("./tests/data/inheritance-depth-2/");

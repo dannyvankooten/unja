@@ -90,7 +90,7 @@ mpc_parser_t *parser_init() {
         " number    : /[0-9]+/ ;"
         " text      : /[^{][^{%#]*/;"
         " string    : '\"' /([^\"])*/ '\"' ;"
-        " factor    : '(' <expression> ')' | <symbol> | <number> | <string> ;"
+        " factor    : <symbol> | <number> | <string> ;"
         " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* ;"
         " lexp      : <term> (<spaces> ('+' | '-') <spaces> <term>)* ;"
         " expression: <lexp> <spaces> '>' <spaces> <lexp> "
@@ -99,6 +99,7 @@ mpc_parser_t *parser_init() {
         "           | <lexp> <spaces> \"<=\" <spaces> <lexp> "
         "           | <lexp> <spaces> \"!=\" <spaces> <lexp> "
         "           | <lexp> <spaces> \"==\" <spaces> <lexp> "
+        "           | \"not\" <spaces> <lexp> "
         "           | <lexp> ;"
         " print     : /{{2}-? */ <expression> / *-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
@@ -329,7 +330,7 @@ void object_free(struct unja_object *obj) {
 int object_is_truthy(struct unja_object *obj) {
     switch (obj->type) {
         case OBJ_NULL: return 0; 
-        case OBJ_STRING: return strlen(obj->string) > 0;
+        case OBJ_STRING: return strlen(obj->string) > 0 && strcmp(obj->string, "0") != 0;
         case OBJ_INT: return obj->integer > 0;
     }
 
@@ -356,6 +357,7 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct context *ctx) 
         if (value == NULL) {
             return &null_object;
         }
+
         return make_string_object(value, NULL);
     } else if(strstr(node->tag, "number|")) {
         return make_int_object(atoi(node->contents));
@@ -434,9 +436,18 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
         return eval_expression_value(expr, ctx);
     }
 
-    /* otherwise: with operator */
-    int offset = 0; 
     struct unja_object *result;
+
+    /* singular negated term */
+    if (strcmp(expr->children[0]->contents, "not") == 0) {
+        result = eval_expression_value(expr->children[2], ctx);
+        struct unja_object *negated = make_int_object(!object_to_int(result));
+        object_free(result);
+        return negated;
+    }
+
+    /* otherwise: with operator */
+    unsigned int offset = 0; 
     mpc_ast_t *left_node = expr->children[0];
     struct unja_object *left = eval_expression(left_node, ctx);
 
@@ -511,11 +522,31 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
         char *tmp_key = t->children[2]->contents;
         char *iterator_key = t->children[4]->contents;
         struct vector *list = hashmap_resolve(ctx->vars, iterator_key);
+
+        /* add "loop" variable to context */
+        struct hashmap *loop = hashmap_new();
+        char index[8], first[2], last[2];
+        hashmap_insert(loop, "index", index);
+        hashmap_insert(loop, "first", first);
+        hashmap_insert(loop, "last", last);
+        hashmap_insert(ctx->vars, "loop", loop);
+
+        /* loop over values in vector */
         for (int i=0; i < list->size; i++) {
+            /* set loop variable values */
+            sprintf(index, "%d", i);
+            sprintf(first, "%d", i == 0);
+            sprintf(last, "%d", i == (list->size - 1));
             hashmap_insert(ctx->vars, tmp_key, list->values[i]);
             trim_whitespace = strstr(t->children[5]->contents, "-") ? 1 : 0;
+
+            /* evaluate body */
             eval(buf, t->children[6], ctx);
         }
+
+        /* remove "loop" variable from context */
+        hashmap_remove(ctx->vars, "loop");
+        hashmap_free(loop);
 
         /* trim trailing whitespace if closing tag has minus sign */
         if (strstr(t->children[7]->contents, "-")) {
