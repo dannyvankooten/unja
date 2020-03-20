@@ -484,4 +484,11 @@ TEST(filter_wordcount) {
     free(output);
 }
 
+TEST(filter_title) {
+    char *input = "{{ \"Hello world\" | length }}";
+    char *output = template_string(input, NULL);
+    assert_str(output, "11");
+    free(output);
+}
+
 END_TESTS 

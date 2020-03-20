@@ -666,11 +666,20 @@ struct unja_object *filter_wordcount(struct unja_object *obj) {
     return make_int_object(word_count);
 }
 
+
+struct unja_object *filter_length(struct unja_object *obj) {
+    assert(obj->type == OBJ_STRING);
+    int len = strlen(obj->string);
+    object_free(obj);
+    return make_int_object(len);
+}
+
 struct hashmap *default_filters() {
     struct hashmap *filters = hashmap_new();
     hashmap_insert(filters, "trim", filter_trim);
     hashmap_insert(filters, "lower", filter_lower);
     hashmap_insert(filters, "wordcount", filter_wordcount);
+    hashmap_insert(filters, "length", filter_length);
     return filters;
 }
 
