@@ -131,30 +131,6 @@ TEST(expr_multiply) {
     free(output);
 }
 
-TEST(expr_gt) {
-    char *input = "Hello {{ 5 > 4 }}.";
-    char *output = template_string(input, NULL);
-    assert_str(output, "Hello 1.");
-    free(output);
-
-    input = "Hello {{ 5 > 6 }}.";
-    output = template_string(input, NULL);
-    assert_str(output, "Hello 0.");
-    free(output);
-}
-
-TEST(expr_lt) {
-    char *input = "Hello {{ 5 < 4 }}.";
-    char *output = template_string(input, NULL);
-    assert_str(output, "Hello 0.");
-    free(output);
-
-    input = "Hello {{ 4 < 5 }}.";
-    output = template_string(input, NULL);
-    assert_str(output, "Hello 1.");
-    free(output);
-}
-
 TEST(expr_whitespace) {
     char *input = "Hello \n{{- \"world\" -}}\n.";
     char *output = template_string(input, NULL);
@@ -227,12 +203,13 @@ TEST(if_block) {
         char *input;
         char *expected_output;
     } tests[] = {
-        {"{% if 5 > 10 %}1{% endif %}.", "."},
-        {"{% if 10 > 5 %}1{% endif %}.", "1."},
-        {"{% if foobar %}1{% endif %}.", "."},
-        {"{% if name %}1{% endif %}.", "1."},
-        {"{% if age > 10 %}1{% endif %}.", "1."},
-        {"{% if 10+1 > 10 %}1{% endif %}.", "1."},
+        {"{% if 5 > 10 %}1{% endif %}", ""},
+        {"{% if 10 > 5 %}1{% endif %}", "1"},
+        {"{% if foobar %}1{% endif %}", ""},
+        {"{% if name %}1{% endif %}", "1"},
+        {"{% if age > 10 %}1{% endif %}", "1"},
+        {"{% if 10 + 1 > 10 %}1{% endif %}", "1"},
+        {"{% if 6 > 10 - 5 %}1{% endif %}", "1"},
     };
 
     struct hashmap *ctx = hashmap_new();
@@ -245,6 +222,107 @@ TEST(if_block) {
     }
 
     hashmap_free(ctx);
+}
+
+TEST(expr_gt) {
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 > 9 %}1{% endif %}", "1"},
+        {"{% if 10 > 10 %}1{% endif %}", ""},
+        {"{% if 10 > 11 %}1{% endif %}", ""},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+TEST(expr_gte) {
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 >= 9 %}1{% endif %}", "1"},
+        {"{% if 10 >= 10 %}1{% endif %}", "1"},
+        {"{% if 10 >= 11 %}1{% endif %}", ""},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+TEST(expr_lt) {
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 < 9 %}1{% endif %}", ""},
+        {"{% if 10 < 10 %}1{% endif %}", ""},
+        {"{% if 10 < 11 %}1{% endif %}", "1"},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+TEST(expr_lte) {
+    struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 <= 9 %}1{% endif %}", ""},
+        {"{% if 10 <= 10 %}1{% endif %}", "1"},
+        {"{% if 10 <= 11 %}1{% endif %}", "1"},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+
+TEST(expr_eq) {
+   struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 == 20 %}1{% endif %}", ""},
+        {"{% if 10 == 10 %}1{% endif %}", "1"},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+TEST(expr_not_eq) {
+   struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if 10 != 20 %}1{% endif %}", "1"},
+        {"{% if 10 != 10 %}1{% endif %}", ""},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
 }
 
 TEST(if_block_whitespace) {
@@ -264,6 +342,8 @@ TEST(if_else_block) {
         {"{% if foobar %}1{% else %}2{% endif %}", "2"},
         {"{% if name %}1{% else %}2{% endif %}", "1"},
         {"{% if age < 10 %}1{% else %}2{% endif %}", "2"},
+        {"{% if age + 5 < 10 %}1{% else %}2{% endif %}", "2"},
+        {"{% if age + 5 > 29 %}1{% else %}2{% endif %}", "1"},
     };
 
     struct hashmap *ctx = hashmap_new();

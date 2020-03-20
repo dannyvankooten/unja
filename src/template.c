@@ -68,7 +68,8 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *string = mpc_new("string");
     mpc_parser_t *text = mpc_new("text");
     mpc_parser_t *print = mpc_new("print");
-    mpc_parser_t *expression = mpc_new("expression");
+    mpc_parser_t *lexp = mpc_new("lexp");
+    mpc_parser_t *exp = mpc_new("expression");
     mpc_parser_t *comment = mpc_new("comment");
     mpc_parser_t *statement = mpc_new("statement");
     mpc_parser_t *statement_open = mpc_new("statement_open");
@@ -91,9 +92,15 @@ mpc_parser_t *parser_init() {
         " string    : '\"' /([^\"])*/ '\"' ;"
         " factor    : '(' <expression> ')' | <symbol> | <number> | <string> ;"
         " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* ;"
-        /* TODO: move > and < to lower predence grammar group */
-        " expression: <term> (<spaces> ('+' | '-' | '>' | '<') <spaces> <term>)* ;"
-        " print     : /{{2}-? */ <expression> / *-?}}/ ;"
+        " lexp      : <term> (<spaces> ('+' | '-') <spaces> <term>)* ;"
+        " expression: <lexp> <spaces> '>' <spaces> <lexp> "
+        "           | <lexp> <spaces> '<' <spaces> <lexp> "
+        "           | <lexp> <spaces> \">=\" <spaces> <lexp> "
+        "           | <lexp> <spaces> \"<=\" <spaces> <lexp> "
+        "           | <lexp> <spaces> \"!=\" <spaces> <lexp> "
+        "           | <lexp> <spaces> \"==\" <spaces> <lexp> "
+        "           | <lexp> ;"
+        " print     : /{{2}-? */ <lexp> / *-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: /{\%-? */;"
         " statement_close: / *-?\%}/;"
@@ -106,13 +113,15 @@ mpc_parser_t *parser_init() {
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         spaces,
-        factor, term,
+        factor, 
+        term,
         symbol, 
         text,
         number,
         string,
         print,
-        expression, 
+        lexp,
+        exp, 
         comment,
         statement_open, 
         statement_close, 
@@ -133,6 +142,7 @@ mpc_ast_t *parse(char *tmpl) {
     mpc_result_t r;
 
     if (!mpc_parse("input", tmpl, parser, &r)) {
+        puts(tmpl);
         mpc_err_print(r.error);
         mpc_err_delete(r.error);
         return NULL;
@@ -371,8 +381,30 @@ struct unja_object *eval_infix_expression(struct unja_object *left, char *op, st
         case '-': result = object_to_int(left) - object_to_int(right); break;
         case '/': result = object_to_int(left) / object_to_int(right); break;
         case '*': result = object_to_int(left) * object_to_int(right); break;
-        case '>': result = object_to_int(left) > object_to_int(right); break;
-        case '<': result = object_to_int(left) < object_to_int(right); break;
+        case '>': 
+            if (op[1] == '=') {
+                result = object_to_int(left) >= object_to_int(right);    
+            } else {
+                result = object_to_int(left) > object_to_int(right); 
+            }
+            break;
+        case '<': 
+            if (op[1] == '=') {
+                result = object_to_int(left) <= object_to_int(right);    
+            } else {
+                result = object_to_int(left) < object_to_int(right); 
+            }
+            break;
+        case '!': 
+            if (op[1] == '=') {
+                result = object_to_int(left) != object_to_int(right);    
+            }
+            break;
+        case '=': 
+            if (op[1] == '=') {
+                result = object_to_int(left) == object_to_int(right);    
+            }
+            break;
     }
 
     object_free(left);
