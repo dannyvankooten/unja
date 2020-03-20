@@ -309,6 +309,22 @@ TEST(expr_eq) {
     }
 }
 
+TEST(expr_string_eq) {
+   struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if \"foo\" == \"bar\" %}1{% endif %}", ""},
+        {"{% if \"foo\" == \"foo\" %}1{% endif %}", "1"},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
 TEST(expr_not_eq) {
    struct {
         char *input;
@@ -316,6 +332,22 @@ TEST(expr_not_eq) {
     } tests[] = {
         {"{% if 10 != 20 %}1{% endif %}", "1"},
         {"{% if 10 != 10 %}1{% endif %}", ""},
+    };
+
+    for (int i=0; i < ARRAY_SIZE(tests); i++) {
+        char *output = template_string(tests[i].input, NULL);
+        assert_str(output, tests[i].expected_output);
+        free(output);
+    }
+}
+
+TEST(expr_string_not_eq) {
+   struct {
+        char *input;
+        char *expected_output;
+    } tests[] = {
+        {"{% if \"foo\" != \"bar\" %}1{% endif %}", "1"},
+        {"{% if \"foo\" != \"foo\" %}1{% endif %}", ""},
     };
 
     for (int i=0; i < ARRAY_SIZE(tests); i++) {

@@ -100,7 +100,7 @@ mpc_parser_t *parser_init() {
         "           | <lexp> <spaces> \"!=\" <spaces> <lexp> "
         "           | <lexp> <spaces> \"==\" <spaces> <lexp> "
         "           | <lexp> ;"
-        " print     : /{{2}-? */ <lexp> / *-?}}/ ;"
+        " print     : /{{2}-? */ <expression> / *-?}}/ ;"
         " comment   : \"{#\" /[^#][^#}]*/ \"#}\" ;"
         " statement_open: /{\%-? */;"
         " statement_close: / *-?\%}/;"
@@ -366,13 +366,28 @@ struct unja_object *eval_expression_value(mpc_ast_t* node, struct context *ctx) 
     return &null_object;
 }
 
+struct unja_object *eval_string_infix_expression(struct unja_object *left, char *op, struct unja_object *right) {
+    struct unja_object *result;
+
+    if (strcmp(op, "+") == 0) {
+        result = make_string_object(left->string, right->string);
+    } else if (strcmp(op, "==") == 0) {
+        result = make_int_object(strcmp(left->string, right->string) == 0);
+    } else if(strcmp(op, "!=") == 0) {
+        result = make_int_object(strcmp(left->string, right->string) != 0);
+    } else {
+        errx(EXIT_FAILURE, "invalid string operator: %s", op);
+    }
+
+    object_free(left);
+    object_free(right);
+    return result;
+}
+
 struct unja_object *eval_infix_expression(struct unja_object *left, char *op, struct unja_object *right) {
     /* if operator is + and either left or right node is of type string: concat */
-    if (op[0] == '+' && (left->type == OBJ_STRING && right->type == OBJ_STRING)) {           
-        struct unja_object *result = make_string_object(left->string, right->string);
-        object_free(left);
-        object_free(right);
-        return result;
+    if (left->type == OBJ_STRING && right->type == OBJ_STRING) {           
+        return eval_string_infix_expression(left, op, right);
     } 
 
     int result;
