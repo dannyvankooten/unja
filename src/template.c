@@ -17,6 +17,7 @@ struct unja_object {
     enum unja_object_type type;
     int integer;
     char *string;
+    char *string_ptr;
 };
 
 struct unja_object null_object = { 
@@ -82,6 +83,7 @@ mpc_parser_t *parser_init() {
     mpc_parser_t *content = mpc_new("content");
     mpc_parser_t *factor = mpc_new("factor");
     mpc_parser_t *term = mpc_new("term");
+    mpc_parser_t *filter = mpc_new("filter");
 
     template = mpc_new("template");
     mpca_lang(MPCA_LANG_WHITESPACE_SENSITIVE,
@@ -91,7 +93,8 @@ mpc_parser_t *parser_init() {
         " text      : /[^{][^{%#]*/;"
         " string    : '\"' /([^\"])*/ '\"' ;"
         " factor    : <symbol> | <number> | <string> ;"
-        " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* ;"
+        " filter    : <spaces> '|' <spaces> <symbol>; "
+        " term      :  <factor> (<spaces> ('*' | '/' | '%') <spaces> <factor>)* <filter>?;"
         " lexp      : <term> (<spaces> ('+' | '-') <spaces> <term>)* ;"
         " expression: <lexp> <spaces> '>' <spaces> <lexp> "
         "           | <lexp> <spaces> '<' <spaces> <lexp> "
@@ -114,6 +117,7 @@ mpc_parser_t *parser_init() {
         " body      : <content>* ;"
         " template  : /^/ <body> /$/ ;",
         spaces,
+        filter,
         factor, 
         term,
         symbol, 
@@ -270,7 +274,9 @@ struct unja_object *make_string_object(char *value, char *value2) {
         l += strlen(value2);
     }
 
+   
     obj->string = malloc(l);
+    obj->string_ptr = obj->string;
     strcpy(obj->string, value);
     
     if(value2) {
@@ -319,7 +325,7 @@ void object_free(struct unja_object *obj) {
     switch(obj->type) {
         case OBJ_NULL: return;
         case OBJ_STRING: 
-            free(obj->string);
+            free(obj->string_ptr);
         break;
         case OBJ_INT: break;
     }
@@ -339,6 +345,7 @@ int object_is_truthy(struct unja_object *obj) {
 
 struct context {
     struct hashmap *vars;
+    struct hashmap *filters;
     struct env *env;
     struct template *current_template;
 };
@@ -451,8 +458,21 @@ struct unja_object *eval_expression(mpc_ast_t* expr, struct context *ctx) {
     unsigned int offset = 0; 
     mpc_ast_t *left_node = expr->children[0];
     struct unja_object *left = eval_expression(left_node, ctx);
+    result = left;
 
-    while (offset < expr->children_num - 1) {
+    while (offset < (expr->children_num - 1)) {
+        /* Check if we arrived at a filter (guaranteed to be last in expression list) */
+        if (strstr(expr->children[offset+1]->tag, "filter")) {
+            char *filter_name = expr->children[offset+1]->children[3]->contents;
+            struct unja_object *(*filter_fn)(struct unja_object *) = hashmap_get(ctx->filters, filter_name);
+            if (NULL == filter_fn) {
+                errx(EXIT_FAILURE, "unknown filter: %s", filter_name);
+            }
+            result = filter_fn(result);
+            break;
+        }
+
+
         mpc_ast_t *op = expr->children[offset+2];
         mpc_ast_t *right_node = expr->children[offset+4];
         struct unja_object *right = eval_expression(right_node, ctx);
@@ -598,7 +618,6 @@ int eval(struct buffer *buf, mpc_ast_t* t, struct context *ctx) {
     return 0;
 }
 
-
 char *render_ast(mpc_ast_t *ast, struct context *ctx) {
     #if DEBUG
     printf("AST: \n");
@@ -615,12 +634,26 @@ char *render_ast(mpc_ast_t *ast, struct context *ctx) {
     return buf.string;
 }
 
+struct unja_object *filter_trim(struct unja_object *in) {
+    /* TODO: Keep original pointer */
+    in->string = trim_leading_whitespace(in->string);
+    trim_trailing_whitespace(in->string);
+    return in;
+}
+
+struct hashmap *default_filters() {
+    struct hashmap *filters = hashmap_new();
+    hashmap_insert(filters, "trim", filter_trim);
+    return filters;
+}
+
 char *template_string(char *tmpl, struct hashmap *vars) {
     #if DEBUG
     printf("Template: %s\n", tmpl);
     #endif
     mpc_ast_t *ast = parse(tmpl);    
     struct context ctx;
+    ctx.filters = default_filters();
     ctx.vars = vars;
     ctx.env = NULL;
     ctx.current_template = NULL;    

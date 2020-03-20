@@ -454,4 +454,15 @@ TEST(inheritance_depth_2) {
     env_free(env);
 }
 
+TEST(filter) {
+    char *input = "{{ text | trim }}";
+    struct hashmap *ctx = hashmap_new();
+    char *text = "\nHello world\n";
+    hashmap_insert(ctx, "text", text);
+    char *output = template_string(input, ctx);
+    assert_str(output, "Hello world");
+    hashmap_free(ctx);
+    free(output);
+}
+
 END_TESTS 
