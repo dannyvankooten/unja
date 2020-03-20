@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <assert.h>
+
 #include "vendor/mpc.h"
 #include "template.h"
 
@@ -634,16 +636,25 @@ char *render_ast(mpc_ast_t *ast, struct context *ctx) {
     return buf.string;
 }
 
-struct unja_object *filter_trim(struct unja_object *in) {
-    /* TODO: Keep original pointer */
-    in->string = trim_leading_whitespace(in->string);
-    trim_trailing_whitespace(in->string);
-    return in;
+struct unja_object *filter_trim(struct unja_object *obj) {
+    assert(obj->type == OBJ_STRING);
+    obj->string = trim_leading_whitespace(obj->string);
+    trim_trailing_whitespace(obj->string);
+    return obj;
+}
+
+struct unja_object *filter_lower(struct unja_object *obj) {
+    assert(obj->type == OBJ_STRING);
+    for (int i=0; i < strlen(obj->string); i++) {
+        obj->string[i] = tolower(obj->string[i]);
+    }
+    return obj;
 }
 
 struct hashmap *default_filters() {
     struct hashmap *filters = hashmap_new();
     hashmap_insert(filters, "trim", filter_trim);
+    hashmap_insert(filters, "lower", filter_lower);
     return filters;
 }
 
