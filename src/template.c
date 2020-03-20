@@ -645,16 +645,32 @@ struct unja_object *filter_trim(struct unja_object *obj) {
 
 struct unja_object *filter_lower(struct unja_object *obj) {
     assert(obj->type == OBJ_STRING);
-    for (int i=0; i < strlen(obj->string); i++) {
+    int len = strlen(obj->string);
+    for (int i=0; i < len; i++) {
         obj->string[i] = tolower(obj->string[i]);
     }
     return obj;
+}
+
+struct unja_object *filter_wordcount(struct unja_object *obj) {
+    assert(obj->type == OBJ_STRING);
+    int len = strlen(obj->string);
+    int word_count = 1;
+    for (int i=0; i < len; i++) {
+        if (isspace(obj->string[i])) {
+            word_count++;
+        }
+    }
+
+    object_free(obj);
+    return make_int_object(word_count);
 }
 
 struct hashmap *default_filters() {
     struct hashmap *filters = hashmap_new();
     hashmap_insert(filters, "trim", filter_trim);
     hashmap_insert(filters, "lower", filter_lower);
+    hashmap_insert(filters, "wordcount", filter_wordcount);
     return filters;
 }
 

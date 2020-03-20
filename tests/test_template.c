@@ -472,4 +472,16 @@ TEST(filter_lower) {
     free(output);
 }
 
+TEST(filter_wordcount) {
+    char *input = "{{ \"Hello World. How are we?\" | wordcount }}";
+    char *output = template_string(input, NULL);
+    assert_str(output, "5");
+    free(output);
+
+    input = "{% if \"Hello World. How are we?\" | wordcount > 4 %}1{% endif %}";
+    output = template_string(input, NULL);
+    assert_str(output, "1");
+    free(output);
+}
+
 END_TESTS 
