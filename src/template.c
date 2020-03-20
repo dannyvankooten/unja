@@ -398,6 +398,7 @@ struct unja_object *eval_infix_expression(struct unja_object *left, char *op, st
         case '-': result = object_to_int(left) - object_to_int(right); break;
         case '/': result = object_to_int(left) / object_to_int(right); break;
         case '*': result = object_to_int(left) * object_to_int(right); break;
+        case '%': result = object_to_int(left) % object_to_int(right); break;
         case '>': 
             if (op[1] == '=') {
                 result = object_to_int(left) >= object_to_int(right);    

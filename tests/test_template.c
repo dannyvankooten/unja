@@ -110,23 +110,30 @@ TEST(expr_op_precedence) {
 }
 
 TEST(expr_subtract) {
-    char *input = "Hello {{ 5 - 5 }}.";
+    char *input = "{{ 5 - 5 }}";
     char *output = template_string(input, NULL);
-    assert_str(output, "Hello 0.");
+    assert_str(output, "0");
     free(output);
 }
 
 TEST(expr_divide) {
-    char *input = "Hello {{ 5 / 5 }}.";
+    char *input = "{{ 5 / 5 }}";
     char *output = template_string(input, NULL);
-    assert_str(output, "Hello 1.");
+    assert_str(output, "1");
     free(output);
 }
 
 TEST(expr_multiply) {
-    char *input = "Hello {{ 5 * 5 }}.";
+    char *input = "{{ 5 * 5 }}";
     char *output = template_string(input, NULL);
-    assert_str(output, "Hello 25.");
+    assert_str(output, "25");
+    free(output);
+}
+
+TEST(expr_modulo) {
+    char *input = "{{ 5 % 4 }}";
+    char *output = template_string(input, NULL);
+    assert_str(output, "1");
     free(output);
 }
 
