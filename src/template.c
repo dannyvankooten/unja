@@ -425,11 +425,15 @@ struct unja_object *eval_infix_expression(struct unja_object *left, char *op, st
         case '!': 
             if (op[1] == '=') {
                 result = object_to_int(left) != object_to_int(right);    
+            } else {
+                errx(EXIT_FAILURE, "invalid int operator: %s", op);
             }
             break;
         case '=': 
             if (op[1] == '=') {
                 result = object_to_int(left) == object_to_int(right);    
+            } else {
+                errx(EXIT_FAILURE, "invalid int operator: %s", op);
             }
             break;
     }
