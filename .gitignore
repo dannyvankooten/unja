@@ -3,3 +3,5 @@ hyde
 bin/
 .vscode
 vgcore.*
+valgrind-out.txt
+.vagrant
