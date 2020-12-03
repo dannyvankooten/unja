@@ -197,6 +197,9 @@ struct env *env_new(char *dirname) {
         strcpy(name, de->d_name);
 
         char *tmpl = read_file(name);
+        #if DEBUG
+        printf("Parsing template from file %s: %s\n", name, tmpl);
+        #endif
         mpc_ast_t *ast = parse(tmpl);
         free(tmpl);
 
@@ -242,7 +245,7 @@ char *read_file(char *filename) {
     }
 
     unsigned int read = 0;
-    while ( (read = fread(input, 1, BUFSIZ, f)) > 0) {
+    while ( (read = fread(input + read, 1, BUFSIZ, f)) > 0) {
         size += read;
         input = realloc(input, size + BUFSIZ);
     }
