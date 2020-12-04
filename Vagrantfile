@@ -1,8 +1,9 @@
 # A basic Vagrant box to be able to use GDB and Valgrind for debugging
 # Usage:
-#   1. Start the machine using `vagrant up`
-#   2. SSH into the machine using `vagrant ssh`
-#   3. 
+#   1. Start the machine: `vagrant up`
+#   2. SSH into the machine: `vagrant ssh`
+#   3. Move into the project directory: `cd /vagrant`
+#   4. Run find_memleaks on the binary you want to check: `find_memleaks bin/test_template`
 #
 #
 # -*- mode: ruby -*-

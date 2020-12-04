@@ -690,32 +690,39 @@ struct hashmap *default_filters() {
     return filters;
 }
 
+struct context context_new(struct hashmap *vars, struct env *env, struct template *current_tmpl) {
+    struct context ctx;
+    ctx.filters = default_filters();
+    ctx.vars = vars;
+    ctx.env = env;
+    ctx.current_template = current_tmpl;    
+    return ctx;
+}
+
+void context_free(struct context ctx) {
+    hashmap_free(ctx.filters);
+}
+
 char *template_string(char *tmpl, struct hashmap *vars) {
     #if DEBUG
     printf("Template: %s\n", tmpl);
     #endif
-    mpc_ast_t *ast = parse(tmpl);    
-    struct context ctx;
-    ctx.filters = default_filters();
-    ctx.vars = vars;
-    ctx.env = NULL;
-    ctx.current_template = NULL;    
+    struct mpc_ast_t *ast = parse(tmpl); 
+    struct context ctx = context_new(vars, NULL, NULL);     
     char *output = render_ast(ast, &ctx);
     mpc_ast_delete(ast);
+    context_free(ctx);
     return output;
 }
 
 char *template(struct env *env, char *template_name, struct hashmap *vars) {
     struct template *t = hashmap_get(env->templates, template_name);
-
     #if DEBUG
     printf("Template name: %s\n", t->name);
     printf("Parent: %s\n", t->parent ? t->parent : "None");
     #endif
-    struct context ctx;
-    ctx.vars = vars;
-    ctx.env = env;
-    ctx.current_template = t;    
+
+    struct context ctx = context_new(vars, env, t); 
 
     // find root template
     while (t->parent != NULL) {
@@ -728,5 +735,8 @@ char *template(struct env *env, char *template_name, struct hashmap *vars) {
         }
     }
 
-    return render_ast(t->ast, &ctx);
+   
+    char *output = render_ast(t->ast, &ctx);
+    context_free(ctx);
+    return output;
 }

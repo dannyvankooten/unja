@@ -491,4 +491,12 @@ TEST(filter_title) {
     free(output);
 }
 
+TEST(inheritance_depth_2) {
+    struct env *env = env_new("./tests/data/template-with-logic/");
+    char *output = template(env, "child.tmpl", NULL);
+    assert_str(output, "Header\n\thello world\n\t2 is more than 1.\nFooter\n");
+    free(output);
+    env_free(env);
+}
+
 END_TESTS 

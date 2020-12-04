@@ -1,0 +1,10 @@
+{% extends "base.tmpl" %}
+
+{% block content -%}
+	{{ "Hello World" | lower }}
+	{% if 2 < 1 -%}
+		2 is less than 1.
+	{%- else -%}
+		2 is more than 1.
+	{%- endif %}
+{%- endblock %}
