@@ -4,6 +4,8 @@ Unja  [![Build Status](https://img.shields.io/travis/dannyvankooten/unja/master)
 
 A template engine for C, inspired by Jinja and Liquid. 
 
+This is a work in progress and definitely not usable as it stands.
+
 ### Example
 
 File `base.tmpl`:
